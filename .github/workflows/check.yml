@@ -1,0 +1,39 @@
+name: Simulator checks
+on:
+  push:
+    branches: [main, feature/driving-simulator]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Rules and physics
+        run: npm test
+      - name: Build offline extension
+        run: npm run build
+      - name: Install browser test dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Drive full route with keyboard in offline extension
+        run: npm run test:browser
+      - name: Package extension
+        if: always()
+        run: cd dist && zip -r ../artifacts/pdd-driving-simulator.zip extension INSTALL.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simulator-evidence
+          path: |
+            artifacts/*.png
+            artifacts/*.jpg
+            artifacts/*.json
+            artifacts/*.zip
+          retention-days: 14
