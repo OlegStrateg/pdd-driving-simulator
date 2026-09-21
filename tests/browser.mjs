@@ -15,7 +15,7 @@ const context=await chromium.launchPersistentContext(path.resolve('artifacts/bro
  args:googleChrome?['--enable-unsafe-extension-debugging']:['--disable-extensions-except='+extension,'--load-extension='+extension]
 });
 if(googleChrome){
- const cdp=await context.newCDPSession(context.pages()[0]);
+ const cdp=await context.browser().newBrowserCDPSession();
  const loaded=await cdp.send('Extensions.loadUnpacked',{path:extension});extensionId=loaded.id;
  await cdp.detach();
 }
