@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Практика ПДД — городской маршрут",
+  "version": "0.1.0",
+  "description": "Офлайн-симулятор учебного вождения: город, дорожные ситуации и разбор ошибок.",
+  "action": {
+    "default_title": "Открыть Практику ПДД",
+    "default_popup": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'"
+  }
+}
