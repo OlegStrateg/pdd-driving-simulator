@@ -14,14 +14,14 @@ test('throttle, brake, reverse and steering change vehicle state',()=>{
  assert.ok(c.speed<0&&c.angle<0);
 });
 test('STOP crossing without standstill is recorded',()=>{
- const e=moving(1326,1160,0);run(e,{gas:true},.2);assert.ok(e.faults.some(f=>f.code==='stop'));
+ const e=moving(1476,1160,0);run(e,{gas:true},.2);assert.ok(e.faults.some(f=>f.code==='stop'));
 });
 test('complete stop before line permits crossing',()=>{
- const e=moving(1327,1160,0,0);run(e,{},.3);assert.equal(e.stopDone,true);
+ const e=moving(1477,1160,0,0);run(e,{},.3);assert.equal(e.stopDone,true);
  run(e,{gas:true},1);assert.equal(e.faults.filter(f=>f.code==='stop').length,0);
 });
 test('stopping far from STOP does not satisfy the sign',()=>{
- const e=moving(1250,1160,0,0);run(e,{},1);e.car.x=1326;e.car.speed=40;run(e,{gas:true},.2);
+ const e=moving(1400,1160,0,0);run(e,{},1);e.car.x=1476;e.car.speed=40;run(e,{gas:true},.2);
  assert.ok(e.faults.some(f=>f.code==='stop'));
 });
 test('red crossing fails, green crossing passes',()=>{

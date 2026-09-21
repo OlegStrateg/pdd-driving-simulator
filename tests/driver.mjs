@@ -1,6 +1,6 @@
 
 export const path = [
- [760,1160],[900,1160],[1327,1160],[1380,1160],[1540,1160],
+ [760,1160],[900,1160],[1477,1160],[1510,1160],[1540,1160],
  [1580,1157],[1615,1137],[1637,1100],[1640,1020],[1640,826],[1640,730],[1640,530],
  [1640,455],[1637,420],[1615,382],[1580,362],[1480,360],[1319,360],[1020,360],[530,360],
  [455,360],[415,365],[382,389],[362,425],[360,520],[360,1000],[360,1075],
@@ -18,8 +18,8 @@ export function driver(state,memory){
  let desired=Math.abs(error)>.25?27:47;
  let brake=false;
  // Approach STOP with a stopping-distance envelope; wait for actual standstill.
- if(memory.index<=3&&+c.x>1200&&+c.x<1330&&c.stop!=='true'){
-  const gap=1327-c.x;desired=Math.min(desired,Math.sqrt(Math.max(0,gap-1)*130));
+ if(memory.index<=3&&+c.x>1350&&+c.x<1480&&c.stop!=='true'){
+  const gap=1477-c.x;desired=Math.min(desired,Math.sqrt(Math.max(0,gap-1)*130));
   if(gap<2)desired=0;
  }
  // Stay behind the light line until green.

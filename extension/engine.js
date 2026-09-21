@@ -27,11 +27,11 @@ export class Exam {
    this.started=true;if(!this.signalValid('left'))this.add('signal','Начало движения от правого края дороги');
   }
   const nose=c.x+Math.cos(c.angle)*22,oldNose=prev.x+Math.cos(prev.angle)*22;
-  if(nose>=1315&&nose<=1350&&Math.abs(c.y-1160)<32&&Math.abs(c.angle)<.35&&Math.abs(c.speed)<.12){
+  if(nose>=1465&&nose<=1500&&Math.abs(c.y-1160)<32&&Math.abs(c.angle)<.35&&Math.abs(c.speed)<.12){
    this.stopHold+=dt;if(this.stopHold>=.12)this.stopDone=true;
   } else this.stopHold=0;
-  if(oldNose<1350&&nose>=1350&&c.y>1120&&c.y<1200&&Math.abs(c.angle)<.6&&!this.stopDone)this.add('stop');
-  if(c.x<1270)this.stopDone=false;
+  if(oldNose<1500&&nose>=1500&&c.y>1120&&c.y<1200&&Math.abs(c.angle)<.6&&!this.stopDone)this.add('stop');
+  if(c.x<1420)this.stopDone=false;
   const frontY=c.y+Math.sin(c.angle)*22,oldFrontY=prev.y+Math.sin(prev.angle)*22;
   if(oldFrontY>800&&frontY<=800&&c.x>1600&&c.x<1680&&lightAt(this.time)!=='green')this.add('light');
   const pedestrian=pedestrianAt(this.time);

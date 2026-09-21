@@ -50,9 +50,9 @@ export class Renderer {
   ctx.setLineDash([]);
   // Zebra crossing across both lanes.
   ctx.fillStyle='#e2e2cc';for(let y=1048;y<1194;y+=22)ctx.fillRect(775,y,50,12);
-  ctx.fillRect(1348,1123,4,73);ctx.fillRect(1603,798,73,4);
+  ctx.fillRect(1498,1123,4,73);ctx.fillRect(1603,798,73,4);for(let x=1528;x<1672;x+=22)ctx.fillRect(x,730,12,45);
   ctx.setLineDash([8,5]);ctx.strokeStyle='#eee6cb';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(1295,324);ctx.lineTo(1295,398);ctx.stroke();ctx.setLineDash([]);
-  this.roadText(ctx,'СТОП',1320,1160,-Math.PI/2);
+  this.roadText(ctx,'СТОП',1470,1160,-Math.PI/2);
   this.roadText(ctx,'ПАРКОВАЯ',359,760,-Math.PI/2);
   this.roadText(ctx,'НАБЕРЕЖНАЯ',1640,660,-Math.PI/2);
   this.roadText(ctx,'ЗЕЛЁНЫЙ ПРОСПЕКТ',770,361,0);
@@ -67,7 +67,7 @@ export class Renderer {
    ctx.strokeStyle='#4d655a40';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+25,y+20);ctx.stroke();
    ctx.fillStyle='#364e48';ctx.fillRect(x-2,y-24,4,24);ctx.fillStyle='#ece9c7';ctx.fillRect(x-5,y-30,10,8);
   }
-  this.sign(ctx,835,1218,'cross');this.sign(ctx,1325,1220,'stop');this.sign(ctx,1495,1220,'no-right');
+  this.sign(ctx,835,1218,'cross');this.sign(ctx,1475,1220,'stop');this.sign(ctx,1520,1240,'no-right');
   this.sign(ctx,655,1220,'40');this.sign(ctx,1320,286,'yield');this.sign(ctx,1720,812,'light',lightAt(time));
   this.sign(ctx,1070,1260,'P');
  }
@@ -89,7 +89,7 @@ export class Renderer {
   else if(kind==='stop'){ctx.beginPath();for(let i=0;i<8;i++){const a=Math.PI/8+i*Math.PI/4;const px=Math.cos(a)*22,py=Math.sin(a)*22-12;if(!i)ctx.moveTo(px,py);else ctx.lineTo(px,py);}ctx.closePath();ctx.fillStyle='#bb5c51';ctx.fill();ctx.strokeStyle='#f7edda';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#fff6e1';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillText('STOP',0,-8);}
   else if(kind==='yield'){ctx.beginPath();ctx.moveTo(-23,-30);ctx.lineTo(23,-30);ctx.lineTo(0,9);ctx.closePath();ctx.fillStyle='#f6eedb';ctx.fill();ctx.strokeStyle='#bf6254';ctx.lineWidth=5;ctx.stroke();}
   else if(kind==='40'||kind==='no-right'){ctx.fillStyle='#f7f1df';ctx.beginPath();ctx.arc(0,-14,21,0,7);ctx.fill();ctx.strokeStyle='#c16253';ctx.lineWidth=5;ctx.stroke();ctx.fillStyle='#2a403c';ctx.font='bold 18px system-ui';ctx.textAlign='center';ctx.fillText(kind==='40'?'40':'↱',0,-7);if(kind==='no-right'){ctx.beginPath();ctx.moveTo(-15,1);ctx.lineTo(15,-29);ctx.stroke();}}
-  else {ctx.fillStyle='#57877d';ctx.fillRect(-20,-35,40,40);ctx.strokeStyle='#eee9d6';ctx.lineWidth=2;ctx.strokeRect(-18,-33,36,36);ctx.fillStyle='#faf6e7';ctx.font='bold 24px system-ui';ctx.textAlign='center';ctx.fillText(kind==='P'?'P':'△',0,-6);}
+  else {ctx.fillStyle='#57877d';ctx.fillRect(-20,-35,40,40);ctx.strokeStyle='#eee9d6';ctx.lineWidth=2;ctx.strokeRect(-18,-33,36,36);ctx.fillStyle='#faf6e7';ctx.font='bold 24px system-ui';ctx.textAlign='center';if(kind==='P')ctx.fillText('P',0,-6);else{ctx.beginPath();ctx.moveTo(0,-30);ctx.lineTo(-16,-2);ctx.lineTo(16,-2);ctx.closePath();ctx.fill();ctx.strokeStyle='#29423d';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-21,2,0,7);ctx.moveTo(0,-18);ctx.lineTo(-2,-11);ctx.lineTo(-7,-5);ctx.moveTo(-2,-11);ctx.lineTo(5,-5);ctx.moveTo(-1,-16);ctx.lineTo(6,-12);ctx.moveTo(-1,-16);ctx.lineTo(-7,-12);ctx.stroke();}}
   ctx.restore();
  }
  car(ctx,c,color,time,player=false){
