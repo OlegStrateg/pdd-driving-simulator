@@ -8,6 +8,10 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, chrome]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -21,16 +25,18 @@ jobs:
       - name: Install browser test dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Drive full route with keyboard in offline extension
         run: npm run test:browser
+        env:
+          TEST_BROWSER: ${{ matrix.browser }}
       - name: Package extension
         if: always()
         run: cd dist && zip -r ../artifacts/pdd-driving-simulator.zip extension INSTALL.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: simulator-evidence
+          name: simulator-evidence-${{ matrix.browser }}
           path: |
             artifacts/*.png
             artifacts/*.jpg

@@ -7,11 +7,18 @@ import assert from 'node:assert/strict';
 import {driver} from './driver.mjs';
 await mkdir('artifacts',{recursive:true});
 const extension=path.resolve('dist/extension');
-const extensionId=createHash('sha256').update(extension).digest('hex').slice(0,32).replace(/[0-9a-f]/g,c=>String.fromCharCode(97+parseInt(c,16)));
+const googleChrome=process.env.TEST_BROWSER==='chrome';
+let extensionId=createHash('sha256').update(extension).digest('hex').slice(0,32).replace(/[0-9a-f]/g,c=>String.fromCharCode(97+parseInt(c,16)));
 const context=await chromium.launchPersistentContext(path.resolve('artifacts/browser-profile'),{
- channel:'chromium',headless:true,viewport:{width:1440,height:1000},
- args:['--disable-extensions-except='+extension,'--load-extension='+extension]
+ channel:googleChrome?'chrome':'chromium',headless:true,viewport:{width:1440,height:1000},
+ ignoreDefaultArgs:googleChrome?['--disable-extensions']:[],
+ args:googleChrome?['--enable-unsafe-extension-debugging']:['--disable-extensions-except='+extension,'--load-extension='+extension]
 });
+if(googleChrome){
+ const cdp=await context.newCDPSession(context.pages()[0]);
+ const loaded=await cdp.send('Extensions.loadUnpacked',{path:extension});extensionId=loaded.id;
+ await cdp.detach();
+}
 const errors=[],requests=[];
 context.on('page',p=>{p.on('pageerror',e=>errors.push(e.message));p.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});});
 let page;
@@ -63,7 +70,7 @@ try{
  const report=JSON.parse(await readFile('artifacts/protocol.json','utf8'));
  assert.equal(report.completed,true);assert.ok(report.trace.length>50);
  assert.equal(errors.length,0,errors.join('\n'));assert.equal(requests.length,0,'Extension must work offline without HTTP requests');
- const summary={browser:'Playwright Chromium with unpacked extension',extensionId,offline:true,routeCompleted:true,keyboardOnly:true,seconds:report.duration,faultCount:report.faults.length,consoleErrors:errors,httpRequests:requests,manualGoogleChromeLoadUnpacked:'NOT TESTED'};
+ const summary={browser:googleChrome?'Google Chrome with CDP Load unpacked':'Playwright Chromium with unpacked extension',extensionId,offline:true,routeCompleted:true,keyboardOnly:true,seconds:report.duration,faultCount:report.faults.length,consoleErrors:errors,httpRequests:requests,manualGoogleChromeLoadUnpacked:'NOT TESTED'};
  await writeFile('artifacts/browser-summary.json',JSON.stringify(summary,null,2));
  console.log('BROWSER PASS',JSON.stringify(summary));
  // A compact JPEG in the log enables visual review without publishing a website.
