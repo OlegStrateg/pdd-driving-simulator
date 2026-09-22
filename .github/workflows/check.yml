@@ -37,7 +37,7 @@ jobs:
               for name in names:
                   assert archive.read(name) == (source / name).read_bytes(), name + " differs from source"
               archive.extractall(destination)
-          print("INSTALL ZIP PASS: 11 root files; manifest at root; CRC valid; source bytes match")
+          print(f"INSTALL ZIP PASS: {len(names)} root files; manifest at root; CRC valid; source bytes match")
           PY
       - name: Install browser test dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
@@ -57,6 +57,7 @@ jobs:
           path: |
             artifacts/*.png
             artifacts/*.jpg
+            artifacts/*.html
             artifacts/*.json
             artifacts/*.zip
           retention-days: 14

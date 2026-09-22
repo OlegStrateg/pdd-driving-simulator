@@ -9,10 +9,10 @@ export class Exam {
   this.car=createCar(); this.time=0;this.status='ready';this.stage=0;this.faults=[];this.active=new Set();
   this.pedestrianEvents=new Set();this.hazards={pedestrian:false};
   this.stopDone=false;this.stopHold=0;this.parkHold=0;this.started=false;
-  this.approachLane=null;this.maneuver=null;this.lastTurnTime=-10;this.trace=[];this.recordAt=0;
+  this.signalTurn=null;this.approachLane=null;this.maneuver=null;this.lastTurnTime=-10;this.trace=[];this.recordAt=0;
  }
- start(){this.reset();this.status='running';}
- signal(value){this.car.signal=this.car.signal===value?'off':value;this.car.signalSince=this.time;}
+ start(scenario='route'){this.reset();this.scenario=scenario;this.status='running';if(scenario==='pedestrian'){this.car.x=650;this.time=2;this.started=true;}if(scenario==='priority'){Object.assign(this.car,{x:1420,y:360,angle:Math.PI});this.time=15.2;this.stage=6;this.started=true;}}
+ signal(value){this.car.signal=value==='off'||this.car.signal===value?'off':value;this.car.signalSince=this.time;this.signalTurn=this.car.signal==='off'?null:{angle:this.car.angle,side:this.car.signal,turned:false,settled:0};}
  add(code,detail='',evidence={}){
   this.faults.push({id:this.faults.length+1,evidence,code,...RULES[code],detail,time:Math.round(this.time*10)/10,x:Math.round(this.car.x),y:Math.round(this.car.y)});
  }
@@ -28,6 +28,12 @@ export class Exam {
   advanceCar(c,input,dt);
   if(!this.started&&Math.abs(c.speed)>2){
    this.started=true;if(!this.signalValid('left'))this.add('signal','Начало движения от правого края дороги');
+  }
+  if(this.signalTurn){
+   const turn=this.signalTurn,delta=norm(c.angle-turn.angle);
+   if((turn.side==='left'&&delta<-.65)||(turn.side==='right'&&delta>.65))turn.turned=true;
+   turn.settled=turn.turned&&Math.abs(c.steer)<.1?turn.settled+dt:0;
+   if(turn.settled>.45){c.signal='off';this.signalTurn=null;}
   }
   const nose=c.x+Math.cos(c.angle)*22,oldNose=prev.x+Math.cos(prev.angle)*22;
   if(nose>=1465&&nose<=1500&&Math.abs(c.y-1160)<32&&Math.abs(c.angle)<.35&&Math.abs(c.speed)<.12){
@@ -90,6 +96,8 @@ export class Exam {
    c.x=prev.x;c.y=prev.y;c.speed=0;this.status='accident';return;
   }
   if(c.x<70||c.x>2030||c.y<90||c.y>1410){c.x=prev.x;c.y=prev.y;c.speed=0;}
+  if(this.scenario==='pedestrian'&&c.x>875){this.status='finished';c.speed=0;return;}
+  if(this.scenario==='priority'&&c.x<1100){this.status='finished';c.speed=0;return;}
   const target=ROUTE[this.stage];
   if(this.stage<ROUTE.length-1&&Math.hypot(c.x-target.x,c.y-target.y)<85)this.stage++;
   if(this.stage===ROUTE.length-1){
@@ -99,5 +107,5 @@ export class Exam {
   }
   if(this.time>=this.recordAt){this.trace.push({t:Math.round(this.time),x:Math.round(c.x),y:Math.round(c.y)});this.recordAt=this.time+1;}
  }
- report(){return {app:'Практика ПДД',version:'0.2.0',completed:this.status==='finished',accident:this.status==='accident',duration:Math.round(this.time),checkpoints:this.stage,totalCheckpoints:ROUTE.length-1,faults:this.faults,trace:this.trace,notice:'Учебный протокол. Не официальная оценка экзамена ГИБДД.'};}
+ report(){return {app:'Практика ПДД',version:'0.2.0',scenario:this.scenario||'route',completed:this.status==='finished',accident:this.status==='accident',duration:Math.round(this.time),checkpoints:this.stage,totalCheckpoints:ROUTE.length-1,faults:this.faults,trace:this.trace,notice:'Учебный протокол. Не официальная оценка экзамена ГИБДД.'};}
 }

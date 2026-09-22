@@ -1,56 +1,98 @@
-
 import {Exam} from './engine.js';
 import {Renderer} from './render.js';
-import {ROUTE,RULES} from './level.js';
+import {Renderer3D} from './render3d.js';
+import {ROUTE} from './level.js';
 import {kmh} from './car.js';
+import {reportHTML} from './report.js';
 const $=id=>document.getElementById(id);
-const exam=new Exam(),renderer=new Renderer($('world')),keys=new Set();
+const exam=new Exam(),renderer2d=new Renderer($('world')),renderer3d=new Renderer3D($('world')),keys=new Set();
+const stored=(key,fallback)=>{try{return localStorage.getItem(key)||fallback;}catch{return fallback;}};
+const save=(key,value)=>{try{localStorage.setItem(key,value);}catch{}};
+let mode=stored('view-mode','3d'),last=performance.now(),seenFaults=0,noticeUntil=0,resultShown=false,lastStage=-1,learning=false,learningStep=0,learningKeys=new Set(),tutorialResume=false;
 const driveKeys=new Set(['KeyW','ArrowUp','KeyS','ArrowDown','Space','KeyA','ArrowLeft','KeyD','ArrowRight','KeyR']);
-let last=performance.now(),seenFaults=0,noticeUntil=0,resultShown=false,lastStage=-1;
+const lessons=[
+ {title:'Газ и тормоз',text:'Удерживайте W, чтобы разгоняться. Отпустите — автомобиль начнёт замедляться. S или Пробел тормозит до полной остановки. Нажмите W, затем S.',keys:[['KeyW','W'],['KeyS','S']]},
+ {title:'Повороты и задний ход',text:'A — руль влево, D — вправо. Руль поворачивает автомобиль только в движении. R — задний ход; сначала остановитесь. Проверьте A, D и R.',keys:[['KeyA','A'],['KeyD','D'],['KeyR','R']]},
+ {title:'Поворотники без загадок',text:'Q включает левый сигнал, E — правый. Повторное нажатие той же клавиши выключает его. X выключает любой сигнал. После законченного поворота он отключается автоматически. Проверьте Q, E и X.',keys:[['KeyQ','Q'],['KeyE','E'],['KeyX','X']]},
+ {title:'Пауза, виды и правила',text:'Esc ставит поездку на паузу. V переключает 2D / 3D, C открывает карту. Красная карточка объясняет нарушение; все события сохраняются в журнале справа. ДТП завершает поездку. На переходе дождитесь пешехода. Проверьте V и Esc.',keys:[['KeyV','V'],['Escape','Esc']]}
+];
 ROUTE.forEach((p,i)=>{const li=document.createElement('li');const n=document.createElement('b');n.textContent=String(i+1).padStart(2,'0');const label=document.createElement('span');label.textContent=p.label;li.append(n,label);$('route').append(li);});
-function start(){exam.start();renderer.overview=false;keys.clear();seenFaults=0;resultShown=false;lastStage=-1;$('intro').classList.add('hidden');$('pause-panel').classList.add('hidden');if($('result').open)$('result').close();$('pause').disabled=false;$('finish').disabled=false;$('notice').classList.remove('show');document.activeElement?.blur();}
+function setMode(value){mode=value;save('view-mode',mode);renderer2d.overview=false;$('view-2d').setAttribute('aria-pressed',mode==='2d');$('view-3d').setAttribute('aria-pressed',mode==='3d');$('camera').querySelector('span').textContent='Весь маршрут';}
+setMode(mode);
+function start(){
+ exam.start($('scenario').value);renderer2d.overview=false;renderer3d.angle=exam.car.angle;keys.clear();seenFaults=0;resultShown=false;lastStage=-1;
+ $('intro').classList.add('hidden');$('learning').classList.add('hidden');$('pause-panel').classList.add('hidden');
+ if($('result').open)$('result').close();
+ $('pause').disabled=false;$('finish').disabled=false;$('notice').classList.remove('show');$('live-faults').replaceChildren();$('journal-count').textContent='0';
+ $('camera').querySelector('span').textContent='Весь маршрут';document.querySelector('.drive').classList.remove('fault-flash');document.activeElement?.blur();
+}
+function lessonView(){
+ const item=lessons[learningStep];learningKeys.clear();$('learning-progress').textContent='ЗНАКОМСТВО С УПРАВЛЕНИЕМ · '+(learningStep+1)+' / '+lessons.length;
+ $('learning-title').textContent=item.title;$('learning-text').textContent=item.text;$('learning-keys').replaceChildren();
+ for(const [code,label] of item.keys){const k=document.createElement('kbd');k.dataset.code=code;k.textContent=label;$('learning-keys').append(k);}
+ $('learning-next').disabled=true;$('learning-next').textContent=learningStep===lessons.length-1?'Начать поездку →':'Дальше →';
+ $('learning-confirm').textContent='Нажмите указанные клавиши. Автомобиль пока стоит.';
+}
+function openLearning(resume=false){tutorialResume=resume;learning=true;learningStep=0;keys.clear();$('learning').classList.remove('hidden');$('intro').classList.add('hidden');$('pause-panel').classList.add('hidden');lessonView();}
+function endLearning(){learning=false;save('learned-v2','yes');$('learning').classList.add('hidden');if(tutorialResume){exam.status='running';keys.clear();}else start();}
 function pause(){
+ if(learning)return;
  if(exam.status==='running'){exam.status='paused';keys.clear();$('pause-panel').classList.remove('hidden');}
  else if(exam.status==='paused'){exam.status='running';$('pause-panel').classList.add('hidden');}
 }
 function showResult(){
  if(resultShown)return;resultShown=true;keys.clear();
- const completed=exam.status==='finished';
- if(!completed)exam.status='aborted';
+ const completed=exam.status==='finished',accident=exam.status==='accident';
+ if(!completed&&!accident)exam.status='aborted';
  $('pause-panel').classList.add('hidden');
- $('result-title').textContent=completed?'Маршрут завершён':'Поездка остановлена';
- $('result-summary').textContent=(completed?'Вы прошли городской маршрут. ':'Маршрут пройден не полностью. ')+Math.round(exam.time)+' сек. · Замечаний: '+exam.faults.length;
+ $('result-title').textContent=accident?'ДТП — поездка остановлена':completed?(exam.faults.length?'Завершено с замечаниями':'Выполнено без замечаний'):'Поездка остановлена';
+ $('result-summary').className=exam.faults.length?'result-bad':'result-good';
+ $('result-summary').textContent=(accident?'После столкновения участники остановлены. Разберите причину и повторите упражнение. ':completed?'Задание завершено. ':'Задание пройдено не полностью. ')+Math.round(exam.time)+' сек. · Замечаний: '+exam.faults.length;
  $('fault-list').replaceChildren();
- if(!exam.faults.length){const p=document.createElement('p');p.textContent=completed?'Аккуратная поездка: замечаний нет.':'На пройденном участке замечаний нет.';$('fault-list').append(p);}
+ if(!exam.faults.length){const p=document.createElement('p');p.textContent=completed?'Правильные действия: вы выполнили задание без зафиксированных нарушений.':'На пройденном участке замечаний нет.';$('fault-list').append(p);}
  for(const f of exam.faults){
   const item=document.createElement('div');item.className='fault';
-  const title=document.createElement('strong');title.textContent=f.title;
+  const title=document.createElement('strong');title.textContent=f.id+'. '+f.title;
   const time=document.createElement('small');time.textContent=f.time+' с · '+f.ref;
-  const advice=document.createElement('p');advice.textContent=f.advice+(f.detail?' '+f.detail:'');
-  item.append(time,title,advice);$('fault-list').append(item);
+  const detail=document.createElement('p');detail.textContent='Что произошло: '+(f.detail||f.title);
+  const advice=document.createElement('p');advice.textContent='Как правильно: '+f.advice;
+  item.append(time,title,detail,advice);$('fault-list').append(item);
  }
- $('pause').disabled=true;$('finish').disabled=true;$('result').showModal();
+ save('last-report-v2',JSON.stringify(exam.report()));$('pause').disabled=true;$('finish').disabled=true;$('result').showModal();
 }
-function camera(){renderer.overview=!renderer.overview;$('camera').querySelector('span').textContent=renderer.overview?'За автомобилем':'Весь маршрут';}
-$('start').onclick=start;$('restart').onclick=start;$('pause').onclick=pause;$('resume').onclick=pause;
+function camera(){renderer2d.overview=!renderer2d.overview;$('camera').querySelector('span').textContent=renderer2d.overview?'За автомобилем':'Весь маршрут';}
+function download(content,type,name){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+$('start').onclick=()=>stored('learned-v2','')==='yes'?start():openLearning();
+$('restart').onclick=start;$('pause').onclick=pause;$('resume').onclick=pause;
 $('finish').onclick=showResult;$('camera').onclick=camera;
+$('view-2d').onclick=()=>setMode('2d');$('view-3d').onclick=()=>setMode('3d');
 $('left-signal').onclick=()=>{if(exam.status==='running')exam.signal('left');};
 $('right-signal').onclick=()=>{if(exam.status==='running')exam.signal('right');};
+$('signal-off').onclick=()=>{if(exam.status==='running')exam.signal('off');};
 $('help').onclick=()=>{if(exam.status==='running')pause();$('help-dialog').showModal();};
 $('close-help').onclick=()=>$('help-dialog').close();
+$('repeat-learning').onclick=()=>{$('help-dialog').close();openLearning(exam.status==='paused');};
+$('learning-next').onclick=()=>{if(++learningStep>=lessons.length)endLearning();else lessonView();};
+$('learning-skip').onclick=endLearning;
 $('result').addEventListener('cancel',e=>e.preventDefault());
-$('download').onclick=()=>{
- const url=URL.createObjectURL(new Blob([JSON.stringify(exam.report(),null,2)],{type:'application/json'}));
- const a=document.createElement('a');a.href=url;a.download='pdd-driving-report.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-};
+$('download').onclick=()=>download(reportHTML(exam.report()),'text/html;charset=utf-8','Протокол-поездки.html');
+$('download-json').onclick=()=>download(JSON.stringify(exam.report(),null,2),'application/json','pdd-driving-report.json');
+$('print-report').onclick=()=>window.print();
 document.addEventListener('keydown',e=>{
+ if(learning){
+  e.preventDefault();learningKeys.add(e.code);const expected=lessons[learningStep].keys;
+  for(const k of $('learning-keys').children)k.classList.toggle('pressed',learningKeys.has(k.dataset.code));
+  if(expected.every(([code])=>learningKeys.has(code))){$('learning-next').disabled=false;$('learning-confirm').textContent='Клавиши проверены. Можно продолжать.';}return;
+ }
  if($('help-dialog').open||$('result').open)return;
  if(driveKeys.has(e.code)){e.preventDefault();if(exam.status==='running')keys.add(e.code);}
  if(e.repeat)return;
  if(e.code==='Escape')pause();
  if(e.code==='KeyC')camera();
+ if(e.code==='KeyV')setMode(mode==='3d'?'2d':'3d');
  if(exam.status==='running'&&e.code==='KeyQ')exam.signal('left');
  if(exam.status==='running'&&e.code==='KeyE')exam.signal('right');
+ if(exam.status==='running'&&e.code==='KeyX')exam.signal('off');
 });
 document.addEventListener('keyup',e=>keys.delete(e.code));
 window.addEventListener('blur',()=>{keys.clear();if(exam.status==='running')pause();});
@@ -60,23 +102,35 @@ function ui(){
  $('timer').textContent=String(Math.floor(exam.time/60)).padStart(2,'0')+':'+String(Math.floor(exam.time%60)).padStart(2,'0');
  $('fault-count').textContent=exam.faults.length;
  $('left-signal').setAttribute('aria-pressed',exam.car.signal==='left');$('right-signal').setAttribute('aria-pressed',exam.car.signal==='right');
+ $('signal-state').textContent=exam.car.signal==='off'?'Поворотники выключены':exam.car.signal==='left'?'◀ Левый включён · Q повторно / X':'Правый включён ▶ · E повторно / X';
+ document.querySelector('.signal-help').classList.toggle('active',exam.car.signal!=='off');
+ $('hazard').classList.toggle('hidden',!exam.hazards.pedestrian||exam.status!=='running'||learning);
  if(lastStage!==exam.stage){
-  lastStage=exam.stage;$('instruction').textContent=ROUTE[exam.stage].hint;
-  $('next-label').textContent='ШАГ '+(exam.stage+1)+' / '+ROUTE.length+' · '+ROUTE[exam.stage].label.toUpperCase();
+  lastStage=exam.stage;$('instruction').textContent=exam.scenario==='pedestrian'?'Уступите пешеходу. Дождитесь освобождения пути и проедьте переход.':exam.scenario==='priority'?'Уступите машине на главной дороге. Проедьте перекрёсток без ДТП.':ROUTE[exam.stage].hint;
+  $('next-label').textContent=exam.scenario&&exam.scenario!=='route'?'КОРОТКАЯ ТРЕНИРОВКА':'ШАГ '+(exam.stage+1)+' / '+ROUTE.length+' · '+ROUTE[exam.stage].label.toUpperCase();
   $('progress-text').textContent=exam.stage+' / '+ROUTE.length;$('progress').style.width=(exam.stage/ROUTE.length*100)+'%';
   [...$('route').children].forEach((li,i)=>{li.className=i<exam.stage?'done':i===exam.stage?'current':'';li.querySelector('b').textContent=i<exam.stage?'✓':String(i+1).padStart(2,'0');});
  }
- if(exam.status==='finished'){$('progress').style.width='100%';$('progress-text').textContent=ROUTE.length+' / '+ROUTE.length;}
- if(exam.faults.length>seenFaults){const f=exam.faults.at(-1);$('notice').textContent=f.title;$('notice').classList.add('show');$('coach').textContent=f.advice;noticeUntil=exam.time+4;seenFaults=exam.faults.length;}
- if(exam.time>noticeUntil)$('notice').classList.remove('show');
- // Read-only DOM telemetry for reproducible browser tests; no state mutation API.
- Object.assign($('telemetry').dataset,{x:exam.car.x,y:exam.car.y,angle:exam.car.angle,speed:exam.car.speed,time:exam.time,stage:exam.stage,status:exam.status,signal:exam.car.signal,stop:exam.stopDone,faults:exam.faults.map(f=>f.code).join(',')});
+ if(exam.status==='finished'){$('progress').style.width='100%';$('progress-text').textContent='Выполнено';}
+ if(exam.faults.length>seenFaults){
+  for(const fault of exam.faults.slice(seenFaults)){
+   const li=document.createElement('li');li.dataset.code=fault.code;
+   const label=document.createElement('strong');label.textContent=fault.id+'. '+fault.title;
+   const detail=document.createElement('small');detail.textContent=fault.time+' с · '+fault.ref;
+   li.append(label,detail);li.title=fault.advice;$('live-faults').prepend(li);
+  }
+  const fault=exam.faults.at(-1);
+  $('notice-title').textContent='⚠ '+fault.title;$('notice-detail').textContent=fault.advice;$('notice-rule').textContent=fault.ref+' · '+fault.time+' с · Сохранено в журнале';
+  $('notice').classList.add('show');document.querySelector('.drive').classList.add('fault-flash');$('coach').textContent=fault.advice;noticeUntil=exam.time+6;seenFaults=exam.faults.length;$('journal-count').textContent=exam.faults.length;
+ }
+ if(exam.time>noticeUntil){$('notice').classList.remove('show');document.querySelector('.drive').classList.remove('fault-flash');}
+ Object.assign($('telemetry').dataset,{x:exam.car.x,y:exam.car.y,angle:exam.car.angle,speed:exam.car.speed,time:exam.time,stage:exam.stage,status:exam.status,signal:exam.car.signal,stop:exam.stopDone,mode,learning,faults:exam.faults.map(f=>f.code).join(',')});
 }
 function frame(now){
  const dt=Math.min((now-last)/1000,.05);last=now;
- exam.tick({gas:keys.has('KeyW')||keys.has('ArrowUp'),brake:keys.has('KeyS')||keys.has('ArrowDown')||keys.has('Space'),reverse:keys.has('KeyR'),left:keys.has('KeyA')||keys.has('ArrowLeft'),right:keys.has('KeyD')||keys.has('ArrowRight')},dt);
- renderer.draw(exam,dt);ui();
- if(exam.status==='finished')showResult();
+ if(!learning)exam.tick({gas:keys.has('KeyW')||keys.has('ArrowUp'),brake:keys.has('KeyS')||keys.has('ArrowDown')||keys.has('Space'),reverse:keys.has('KeyR'),left:keys.has('KeyA')||keys.has('ArrowLeft'),right:keys.has('KeyD')||keys.has('ArrowRight')},dt);
+ if(mode==='3d'&&!renderer2d.overview)renderer3d.draw(exam,dt);else{renderer2d.draw(exam,dt);$('world').dataset.rendered='2d';}
+ ui();if(exam.status==='finished'||exam.status==='accident')showResult();
  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

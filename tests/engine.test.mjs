@@ -119,3 +119,9 @@ test('turning out of an oncoming approach is recorded separately',()=>{
  const e=moving(1490,1080,0,40);run(e,{gas:true},.2);run(e,{gas:true,left:true},1);
  assert.ok(e.faults.some(f=>f.code==='turnLane'));
 });
+
+test('signals toggle, explicit off cancels either side and completed turn self-cancels',()=>{
+ const e=moving(1560,1160,0,35);e.signal('left');assert.equal(e.car.signal,'left');e.signal('left');assert.equal(e.car.signal,'off');
+ e.signal('right');e.signal('off');assert.equal(e.car.signal,'off');
+ e.signal('left');run(e,{left:true,gas:true},1.5);run(e,{},1);assert.equal(e.car.signal,'off');
+});
