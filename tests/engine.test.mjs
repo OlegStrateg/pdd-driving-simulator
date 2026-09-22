@@ -71,3 +71,51 @@ test('pause freezes simulation and restart clears evidence',()=>{
  const e=moving(900,1160,0);e.status='paused';run(e,{gas:true},1);assert.equal(e.time,0);assert.equal(e.car.x,900);
  e.add('speed');e.start();assert.equal(e.faults.length,0);assert.equal(e.stage,0);
 });
+
+test('pedestrian on opposite half of road cannot be missed by a short distance check',()=>{
+ const e=moving(752.5,1160,0,35);e.time=2;run(e,{gas:true},.15);
+ const faults=e.faults.filter(f=>f.code==='pedestrian');assert.equal(faults.length,1);
+ assert.equal(faults[0].evidence.crossing,'Садовая, 01');assert.ok(faults[0].evidence.pedestrianY<1100);
+});
+test('creeping into occupied zebra is a violation even below old speed threshold',()=>{
+ const e=moving(754,1160,0,1.5);e.time=4;e.tick({},.01);
+ assert.equal(e.faults.filter(f=>f.code==='pedestrian').length,1);
+});
+test('waiting before occupied zebra is legal, same pedestrian produces one event',()=>{
+ const e=moving(751,1160,0,0);e.time=2;run(e,{},2);assert.equal(e.faults.filter(f=>f.code==='pedestrian').length,0);
+ run(e,{gas:true},2);assert.equal(e.faults.filter(f=>f.code==='pedestrian').length,1);
+});
+test('a pedestrian who cleared the vehicle path or remains on sidewalk does not cause a fault',()=>{
+ for(const time of [.2,9.5,12]){
+  const e=moving(754,1160,0,35);e.time=time;run(e,{},.15);
+  assert.equal(e.faults.filter(f=>f.code==='pedestrian').length,0);
+ }
+});
+test('occupied zebra is checked in opposite direction and at high speed',()=>{
+ const e=moving(848,1080,Math.PI,128);e.time=2;run(e,{gas:true},.05);assert.ok(e.faults.some(f=>f.code==='pedestrian'));
+});
+
+test('traffic collision ends trip and freezes both participants',()=>{
+ const e=moving(1210,350,0,100);e.time=2.38;run(e,{gas:true},1);
+ assert.equal(e.status,'accident');assert.equal(e.faults.filter(f=>f.code==='collision').length,1);
+ const time=e.time,x=e.car.x;run(e,{gas:true},2);assert.equal(e.time,time);assert.equal(e.car.x,x);assert.equal(e.report().accident,true);
+});
+test('side contact is a collision, adjacent cars with a safe gap are not',()=>{
+ const e=moving(1257,350,Math.PI/2,0);e.time=2.38;run(e,{},.1);assert.equal(e.status,'accident');
+ const safe=moving(1275,350,Math.PI/2,0);safe.time=2.38;run(safe,{},.1);assert.equal(safe.status,'running');
+});
+test('wrong-way driving without crossing a line is still recorded',()=>{
+ const e=moving(940,1080,0,20);run(e,{},.1);assert.ok(e.faults.some(f=>f.code==='oncoming'));
+});
+test('legal lanes do not create wrong-way faults in four directions',()=>{
+ for(const [x,y,a] of [[940,1160,0],[940,1080,Math.PI],[1640,650,-Math.PI/2],[1560,650,Math.PI/2]]){
+  const e=moving(x,y,a,20);run(e,{},.1);assert.ok(!e.faults.some(f=>f.code==='oncoming'));
+ }
+});
+test('reversing on a junction is recorded',()=>{
+ const e=moving(1600,1120,0,-10);run(e,{reverse:true},.1);assert.ok(e.faults.some(f=>f.code==='reverseJunction'));
+});
+test('turning out of an oncoming approach is recorded separately',()=>{
+ const e=moving(1490,1080,0,40);run(e,{gas:true},.2);run(e,{gas:true,left:true},1);
+ assert.ok(e.faults.some(f=>f.code==='turnLane'));
+});
