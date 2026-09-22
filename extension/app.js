@@ -47,7 +47,7 @@ function showResult(){
  $('pause-panel').classList.add('hidden');
  $('result-title').textContent=accident?'ДТП — поездка остановлена':completed?(exam.faults.length?'Завершено с замечаниями':'Выполнено без замечаний'):'Поездка остановлена';
  $('result-summary').className=exam.faults.length?'result-bad':'result-good';
- $('result-summary').textContent=(accident?'После столкновения участники остановлены. Разберите причину и повторите упражнение. ':completed?'Задание завершено. ':'Задание пройдено не полностью. ')+Math.round(exam.time)+' сек. · Замечаний: '+exam.faults.length;
+ $('result-summary').textContent=(accident?'После столкновения участники остановлены. Разберите причину и повторите упражнение. ':completed?'Задание завершено. ':'Задание пройдено не полностью. ')+Math.round(exam.time-exam.startedAt)+' сек. · Замечаний: '+exam.faults.length;
  $('fault-list').replaceChildren();
  if(!exam.faults.length){const p=document.createElement('p');p.textContent=completed?'Правильные действия: вы выполнили задание без зафиксированных нарушений.':'На пройденном участке замечаний нет.';$('fault-list').append(p);}
  for(const f of exam.faults){
@@ -99,7 +99,7 @@ window.addEventListener('blur',()=>{keys.clear();if(exam.status==='running')paus
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&exam.status==='running')pause();});
 function ui(){
  $('speed').textContent=Math.round(kmh(exam.car));$('gear').textContent=exam.car.speed>1?'D':exam.car.speed<-1?'R':'N';
- $('timer').textContent=String(Math.floor(exam.time/60)).padStart(2,'0')+':'+String(Math.floor(exam.time%60)).padStart(2,'0');
+ $('timer').textContent=String(Math.floor((exam.time-exam.startedAt)/60)).padStart(2,'0')+':'+String(Math.floor((exam.time-exam.startedAt)%60)).padStart(2,'0');
  $('fault-count').textContent=exam.faults.length;
  $('left-signal').setAttribute('aria-pressed',exam.car.signal==='left');$('right-signal').setAttribute('aria-pressed',exam.car.signal==='right');
  $('signal-state').textContent=exam.car.signal==='off'?'Поворотники выключены':exam.car.signal==='left'?'◀ Левый включён · Q повторно / X':'Правый включён ▶ · E повторно / X';
@@ -108,7 +108,7 @@ function ui(){
  if(lastStage!==exam.stage){
   lastStage=exam.stage;$('instruction').textContent=exam.scenario==='pedestrian'?'Уступите пешеходу. Дождитесь освобождения пути и проедьте переход.':exam.scenario==='priority'?'Уступите машине на главной дороге. Проедьте перекрёсток без ДТП.':ROUTE[exam.stage].hint;
   $('next-label').textContent=exam.scenario&&exam.scenario!=='route'?'КОРОТКАЯ ТРЕНИРОВКА':'ШАГ '+(exam.stage+1)+' / '+ROUTE.length+' · '+ROUTE[exam.stage].label.toUpperCase();
-  $('progress-text').textContent=exam.stage+' / '+ROUTE.length;$('progress').style.width=(exam.stage/ROUTE.length*100)+'%';
+  const short=exam.scenario&&exam.scenario!=='route';$('progress-text').textContent=short?'Упражнение':exam.stage+' / '+ROUTE.length;$('progress').style.width=short?'0%':(exam.stage/ROUTE.length*100)+'%';$('route').classList.toggle('hidden',!!short);
   [...$('route').children].forEach((li,i)=>{li.className=i<exam.stage?'done':i===exam.stage?'current':'';li.querySelector('b').textContent=i<exam.stage?'✓':String(i+1).padStart(2,'0');});
  }
  if(exam.status==='finished'){$('progress').style.width='100%';$('progress-text').textContent='Выполнено';}

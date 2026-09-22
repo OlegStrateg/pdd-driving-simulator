@@ -125,3 +125,8 @@ test('signals toggle, explicit off cancels either side and completed turn self-c
  e.signal('right');e.signal('off');assert.equal(e.car.signal,'off');
  e.signal('left');run(e,{left:true,gas:true},1.5);run(e,{},1);assert.equal(e.car.signal,'off');
 });
+
+test('exercise report measures time since start, not the traffic phase offset',()=>{
+ const e=new Exam();e.start('priority');run(e,{},1);assert.equal(e.report().duration,1);
+ e.add('speed');assert.equal(e.faults.at(-1).time,1);
+});

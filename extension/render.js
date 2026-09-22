@@ -15,7 +15,7 @@ export class Renderer {
   ctx.save();ctx.translate(w/2,h/2);ctx.scale(scale,scale);ctx.translate(-this.camera.x,-this.camera.y);
   this.city(ctx,exam.time);
   if(exam.hazards.pedestrian){ctx.fillStyle='#ffb75f55';ctx.fillRect(770,1040,60,160);ctx.strokeStyle='#ffce70';ctx.lineWidth=3;ctx.strokeRect(770,1040,60,160);}
-  const recent=exam.faults.at(-1);if(recent&&exam.time-recent.time<6){ctx.strokeStyle='#ff7054';ctx.lineWidth=4;ctx.beginPath();ctx.arc(recent.x,recent.y,38,0,7);ctx.stroke();}
+  const recent=exam.faults.at(-1);if(recent&&exam.time-recent.simTime<6){ctx.strokeStyle='#ff7054';ctx.lineWidth=4;ctx.beginPath();ctx.arc(recent.x,recent.y,38,0,7);ctx.stroke();}
   // Route is a dashed educational guide through the right-hand lanes.
   ctx.strokeStyle='#d9f5a780';ctx.lineWidth=3;ctx.setLineDash([9,14]);ctx.beginPath();ctx.moveTo(530,1160);
   for(const p of ROUTE)ctx.lineTo(p.x,p.y);ctx.stroke();ctx.setLineDash([]);
