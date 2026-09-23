@@ -12,7 +12,7 @@ let extensionId=createHash('sha256').update(extension).digest('hex').slice(0,32)
 const context=await chromium.launchPersistentContext(path.resolve('artifacts/browser-profile'),{
  channel:googleChrome?'chrome':'chromium',headless:true,viewport:{width:1440,height:1000},
  ignoreDefaultArgs:googleChrome?['--disable-extensions']:[],
- args:googleChrome?['--enable-unsafe-extension-debugging']:['--disable-extensions-except='+extension,'--load-extension='+extension]
+ args:[ '--use-angle=swiftshader', '--enable-unsafe-swiftshader', ...(googleChrome?['--enable-unsafe-extension-debugging']:['--disable-extensions-except='+extension,'--load-extension='+extension])]
 });
 if(googleChrome){
  const cdp=await context.browser().newBrowserCDPSession();
@@ -30,7 +30,8 @@ try{
  await popup.getByRole('button',{name:'Открыть симулятор'}).click();
  page=await newPage;await page.waitForLoadState();await page.bringToFront();
  assert.ok(page.url().endsWith('/index.html'));
- await page.clock.install();await page.reload();
+ await page.locator('#world3d[data-ready="true"]').waitFor({timeout:90000});
+ await page.clock.install();await page.reload();await page.locator('#world3d[data-ready="true"]').waitFor({timeout:90000});
  await page.clock.pauseAt(new Date(Date.now()+1000));
  await page.clock.runFor(1000);
  await page.screenshot({path:'artifacts/01-start.png'});
@@ -53,6 +54,7 @@ try{
  await page.locator('#view-3d').click();await page.clock.runFor(100);assert.equal(await page.locator('#world').getAttribute('data-rendered'),'3d');assert.equal(await page.locator('#telemetry').getAttribute('data-x'),viewPosition);
  await page.screenshot({path:'artifacts/01b-3d.png'});
  const preview3d=await page.screenshot({type:'jpeg',quality:75});console.log('THREE_D_BASE64:'+preview3d.toString('base64'));
+ await page.locator('#view-2d').click();await page.clock.runFor(50);
  await page.keyboard.down('KeyW');await page.clock.runFor(2500);await page.keyboard.up('KeyW');
  const state=()=>page.locator('#telemetry').evaluate(el=>({...el.dataset}));
  let s=await state();assert.ok(+s.x>600);assert.ok(s.faults.includes('speed')&&s.faults.includes('signal'));

@@ -3,12 +3,15 @@ import {Renderer} from './render.js';
 import {Renderer3D} from './render3d.js';
 import {ROUTE} from './level.js';
 import {kmh} from './car.js';
+import {fetchPlace,pointInPolygon} from './places.js';
+import {advanceCar} from './car.js';
 import {reportHTML} from './report.js';
 const $=id=>document.getElementById(id);
 const exam=new Exam(),renderer2d=new Renderer($('world')),renderer3d=new Renderer3D($('world')),keys=new Set();
 const stored=(key,fallback)=>{try{return localStorage.getItem(key)||fallback;}catch{return fallback;}};
 const save=(key,value)=>{try{localStorage.setItem(key,value);}catch{}};
 let mode=stored('view-mode','3d'),last=performance.now(),seenFaults=0,noticeUntil=0,resultShown=false,lastStage=-1,learning=false,learningStep=0,learningKeys=new Set(),tutorialResume=false;
+let place=null,pendingPlace=null,placeTime=0;
 const driveKeys=new Set(['KeyW','ArrowUp','KeyS','ArrowDown','Space','KeyA','ArrowLeft','KeyD','ArrowRight','KeyR']);
 const lessons=[
  {title:'Газ и тормоз',text:'Удерживайте W, чтобы разгоняться. Отпустите — автомобиль начнёт замедляться. S или Пробел тормозит до полной остановки. Нажмите W, затем S.',keys:[['KeyW','W'],['KeyS','S']]},
@@ -17,9 +20,10 @@ const lessons=[
  {title:'Пауза, виды и правила',text:'Esc ставит поездку на паузу. V переключает 2D / 3D, C открывает карту. Красная карточка объясняет нарушение; все события сохраняются в журнале справа. ДТП завершает поездку. На переходе дождитесь пешехода. Проверьте V и Esc.',keys:[['KeyV','V'],['Escape','Esc']]}
 ];
 ROUTE.forEach((p,i)=>{const li=document.createElement('li');const n=document.createElement('b');n.textContent=String(i+1).padStart(2,'0');const label=document.createElement('span');label.textContent=p.label;li.append(n,label);$('route').append(li);});
-function setMode(value){mode=value;save('view-mode',mode);renderer2d.overview=false;$('view-2d').setAttribute('aria-pressed',mode==='2d');$('view-3d').setAttribute('aria-pressed',mode==='3d');$('camera').querySelector('span').textContent='Весь маршрут';}
+function setMode(value){if(place)value='3d';mode=value;save('view-mode',mode);renderer2d.overview=false;$('view-2d').setAttribute('aria-pressed',mode==='2d');$('view-3d').setAttribute('aria-pressed',mode==='3d');$('camera').querySelector('span').textContent='Весь маршрут';}
 setMode(mode);
 function start(){
+ if(place){place=null;renderer3d.buildCity();}
  exam.start($('scenario').value);renderer2d.overview=false;renderer3d.angle=exam.car.angle;keys.clear();seenFaults=0;resultShown=false;lastStage=-1;
  $('intro').classList.add('hidden');$('learning').classList.add('hidden');$('pause-panel').classList.add('hidden');
  if($('result').open)$('result').close();
@@ -60,7 +64,7 @@ function showResult(){
  }
  save('last-report-v2',JSON.stringify(exam.report()));$('pause').disabled=true;$('finish').disabled=true;$('result').showModal();
 }
-function camera(){renderer2d.overview=!renderer2d.overview;$('camera').querySelector('span').textContent=renderer2d.overview?'За автомобилем':'Весь маршрут';}
+function camera(){if(place)return;renderer2d.overview=!renderer2d.overview;$('camera').querySelector('span').textContent=renderer2d.overview?'За автомобилем':'Весь маршрут';}
 function download(content,type,name){const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('start').onclick=()=>stored('learned-v2','')==='yes'?start():openLearning();
 $('restart').onclick=start;$('pause').onclick=pause;$('resume').onclick=pause;
@@ -126,10 +130,50 @@ function ui(){
  if(exam.time>noticeUntil){$('notice').classList.remove('show');document.querySelector('.drive').classList.remove('fault-flash');}
  Object.assign($('telemetry').dataset,{x:exam.car.x,y:exam.car.y,angle:exam.car.angle,speed:exam.car.speed,time:exam.time,stage:exam.stage,status:exam.status,signal:exam.car.signal,stop:exam.stopDone,mode,learning,faults:exam.faults.map(f=>f.code).join(',')});
 }
+
+function tick(input,dt){
+ if(!place){exam.tick(input,dt);return;}
+ if(exam.status!=='running')return;
+ exam.time+=dt;const c=exam.car,old={...c};advanceCar(c,input,dt);
+ const hit=place.buildings.some(b=>pointInPolygon(c.x/10,c.y/10,b.points));
+ if(hit){c.x=old.x;c.y=old.y;c.speed=0;$('coach').textContent='Здание: движение остановлено. Отъедьте назад.';}
+ if(Math.abs(c.x)>4000||Math.abs(c.y)>4000){c.x=old.x;c.y=old.y;c.speed=0;$('coach').textContent='Граница загруженного участка';}
+ $('instruction').textContent=place.name+' · свободная поездка без оценки ПДД';
+ $('next-label').textContent='РЕАЛЬНЫЕ УЛИЦЫ · УСЛОВНЫЕ ФАСАДЫ';
+}
+function previewPlace(p){
+ pendingPlace=p;const cv=$('place-preview'),ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);const scale=.34;
+ const xy=q=>[cv.width/2+q.x*scale,cv.height/2+q.y*scale];
+ ctx.fillStyle='#b3b5a5';for(const b of p.buildings){ctx.beginPath();b.points.forEach((v,i)=>i?ctx.lineTo(...xy(v)):ctx.moveTo(...xy(v)));ctx.closePath();ctx.fill();}
+ ctx.strokeStyle='#52616c';ctx.lineCap='round';
+ for(const r of p.roads){ctx.lineWidth=Math.max(2,r.width*scale);ctx.beginPath();r.points.forEach((v,i)=>i?ctx.lineTo(...xy(v)):ctx.moveTo(...xy(v)));ctx.stroke();}
+ const [x,y]=xy(p.spawn);ctx.fillStyle='#bf3b2e';ctx.beginPath();ctx.arc(x,y,5,0,7);ctx.fill();
+ $('drive-place').disabled=false;$('place-status').textContent=p.name+': '+p.roads.length+' улиц, '+p.buildings.length+' зданий. Красная точка — старт.';
+}
+$('choose-place').onclick=()=>$('places-dialog').showModal();
+$('close-places').onclick=()=>$('places-dialog').close();
+$('saved-place').onclick=()=>{try{const p=JSON.parse(stored('saved-place-v1','null'));if(!p)throw Error('Сначала загрузите участок');previewPlace(p);}catch(e){$('place-status').textContent=e.message;}};
+$('load-place').onclick=async()=>{
+ $('load-place').disabled=true;$('drive-place').disabled=true;$('place-status').textContent='Загружаем улицы…';
+ try{
+  const a=$('place-lat').value,b=$('place-lon').value;if(!a.trim()||!b.trim())throw Error('Введите обе координаты');
+  const p=await fetchPlace(Number(a),Number(b),$('place-name').value);
+  previewPlace(p);try{localStorage.setItem('saved-place-v1',JSON.stringify(p));}catch{$('place-status').textContent+=' Не удалось сохранить: хранилище заполнено.';}
+ }catch(e){$('place-status').textContent='Не удалось загрузить: '+e.message;}
+ finally{$('load-place').disabled=false;}
+};
+$('drive-place').onclick=()=>{
+ if(!pendingPlace)return;
+ start();place=pendingPlace;exam.scenario='free';exam.started=true;exam.time=0;exam.startedAt=0;
+ Object.assign(exam.car,{x:place.spawn.x*10,y:place.spawn.y*10,angle:place.spawn.angle,speed:0});
+ renderer3d.buildCity(place);renderer3d.angle=exam.car.angle;setMode('3d');
+ $('places-dialog').close();$('intro').classList.add('hidden');$('route').classList.add('hidden');
+ $('coach').textContent='Здесь можно познакомиться с геометрией улиц. Правила и знаки для этого участка не проверены.';
+};
 function frame(now){
  const dt=Math.min((now-last)/1000,.05);last=now;
- if(!learning)exam.tick({gas:keys.has('KeyW')||keys.has('ArrowUp'),brake:keys.has('KeyS')||keys.has('ArrowDown')||keys.has('Space'),reverse:keys.has('KeyR'),left:keys.has('KeyA')||keys.has('ArrowLeft'),right:keys.has('KeyD')||keys.has('ArrowRight')},dt);
- if(mode==='3d'&&!renderer2d.overview)renderer3d.draw(exam,dt);else{renderer2d.draw(exam,dt);$('world').dataset.rendered='2d';}
+ if(!learning)tick({gas:keys.has('KeyW')||keys.has('ArrowUp'),brake:keys.has('KeyS')||keys.has('ArrowDown')||keys.has('Space'),reverse:keys.has('KeyR'),left:keys.has('KeyA')||keys.has('ArrowLeft'),right:keys.has('KeyD')||keys.has('ArrowRight')},dt);
+ if(mode==='3d'&&!renderer2d.overview)renderer3d.draw(exam,dt);else{renderer3d.visible(false);renderer2d.draw(exam,dt);$('world').dataset.rendered='2d';}
  ui();if(exam.status==='finished'||exam.status==='accident')showResult();
  requestAnimationFrame(frame);
 }

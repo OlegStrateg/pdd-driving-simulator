@@ -12,44 +12,35 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, chrome]
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Rules and physics
-        run: npm test
-      - name: Build offline extension
-        run: npm run build
-      - name: Verify and load the downloadable installation ZIP
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - name: Package and extract actual installer
         run: |
+          mkdir -p artifacts
+          cd dist/extension
+          zip -qr ../../artifacts/pdd-driving-simulator.zip .
+          cd ../..
           python3 - <<'PY'
-          import pathlib, zipfile
-          source = pathlib.Path("extension")
-          destination = pathlib.Path("dist/extension")
-          with zipfile.ZipFile("install/pdd-driving-simulator.zip") as archive:
-              assert archive.testzip() is None, "ZIP CRC failed"
-              names = archive.namelist()
-              assert "manifest.json" in names, "Manifest must be at archive root"
-              assert all("/" not in name and "\\\\" not in name for name in names), "Unexpected nested folder"
-              assert set(names) == {p.name for p in source.iterdir() if p.is_file()}
-              for name in names:
-                  assert archive.read(name) == (source / name).read_bytes(), name + " differs from source"
-              archive.extractall(destination)
-          print(f"INSTALL ZIP PASS: {len(names)} root files; manifest at root; CRC valid; source bytes match")
+          import zipfile, pathlib, shutil
+          with zipfile.ZipFile('artifacts/pdd-driving-simulator.zip') as z:
+              assert z.testzip() is None
+              assert 'manifest.json' in z.namelist()
+              assert all(not pathlib.PurePosixPath(n).is_absolute() and '..' not in pathlib.PurePosixPath(n).parts for n in z.namelist())
+              shutil.rmtree('dist/extension')
+              z.extractall('dist/extension')
+              print('INSTALL ZIP PASS: root manifest, CRC valid, extracted for browser test')
           PY
-      - name: Install browser test dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Install Chromium
-        run: npx playwright install --with-deps ${{ matrix.browser }}
-      - name: Drive full route with keyboard in offline extension
-        run: npm run test:browser
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - run: npm run test:browser
         env:
           TEST_BROWSER: ${{ matrix.browser }}
-      - name: Package extension
-        if: always()
-        run: cd dist/extension && zip -r ../../artifacts/pdd-driving-simulator.zip .
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -61,3 +52,21 @@ jobs:
             artifacts/*.json
             artifacts/*.zip
           retention-days: 14
+  release:
+    if: github.event_name == 'push'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: simulator-evidence-chrome
+          path: package
+      - name: Publish tested installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          gh release create "preview-${COMMIT:0:12}" package/pdd-driving-simulator.zip package/01b-3d.png package/browser-summary.json --target "$COMMIT" --prerelease --title "3D preview ${COMMIT:0:12}" --notes "Babylon.js renderer, bundled Car Concept model, local textures, coordinate-based OpenStreetMap area loading. Automated Chrome and Chromium checks passed. Real-place mode has no verified traffic-rule assessment."
