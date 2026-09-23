@@ -16,8 +16,9 @@ export class Renderer3D {
   const B=globalThis.BABYLON;this.B=B;this.canvas=canvas;this.angle=0;
   this.surface=document.createElement('canvas');this.surface.id='world3d';canvas.after(this.surface);
   this.engine=new B.Engine(this.surface,true,{preserveDrawingBuffer:true,stencil:true,disableWebGL2Support:false});
+  this.surface.dataset.renderer=this.engine.getGlInfo().renderer;
   this.engine.setHardwareScalingLevel(Math.max(1,(devicePixelRatio||1)/1.25));
-  this.scene=new B.Scene(this.engine);this.scene.clearColor=new B.Color4(.58,.72,.82,1);
+  this.scene=new B.Scene(this.engine);this.scene.useRightHandedSystem=true;this.scene.clearColor=new B.Color4(.58,.72,.82,1);
   this.scene.fogMode=B.Scene.FOGMODE_EXP2;this.scene.fogDensity=.00028;this.scene.fogColor=new B.Color3(.66,.75,.79);
   this.camera=new B.FreeCamera('chase',new B.Vector3(400,65,1160),this.scene);
   this.camera.minZ=1;this.camera.maxZ=12000;this.camera.fov=.85;
@@ -149,13 +150,15 @@ export class Renderer3D {
   const second=holder.clone('traffic-model',this.other);second.setEnabled(true);
   for(const m of r.meshes){m.receiveShadows=true;this.shadow.addShadowCaster(m);}
   for(const m of second.getChildMeshes())this.shadow.addShadowCaster(m);
-  this.wheels=r.transformNodes.filter(n=>/wheel/i.test(n.name)&&!n.parent?.name?.match(/wheel/i)).map(n=>({node:n,rotation:n.rotation.clone(),quaternion:n.rotationQuaternion?.clone()}));
+  this.wheelRoll=0;this.wheels=r.transformNodes.filter(n=>/^Wheel(Front|Rear)[LR]$/.test(n.name)).map(n=>({node:n,rotation:n.rotation.clone(),quaternion:n.rotationQuaternion?.clone()}));
   this.surface.dataset.model='CarConcept';this.surface.dataset.ready='true';
  }
  visible(value){this.surface.classList.toggle('hidden',!value);this.canvas.classList.toggle('hidden',value);}
  draw(exam,dt){
   this.visible(true);const B=this.B,c=exam.car;
   this.angle+=Math.atan2(Math.sin(c.angle-this.angle),Math.cos(c.angle-this.angle))*Math.min(1,dt*5);
+  this.wheelRoll=(this.wheelRoll||0)+c.speed*dt/3.8;
+  for(const w of this.wheels||[]){const base=w.quaternion||B.Quaternion.FromEulerVector(w.rotation);w.node.rotationQuaternion=B.Quaternion.RotationAxis(B.Axis.Z,/Front/.test(w.node.name)?-c.steer:0).multiply(B.Quaternion.RotationAxis(B.Axis.X,this.wheelRoll)).multiply(base);}
   this.player.position.set(c.x,2,c.y);this.player.rotation.y=-c.angle;
   const distance=110+Math.abs(c.speed)*.12,a=this.angle;
   this.camera.position.set(c.x-Math.cos(a)*distance,62,c.y-Math.sin(a)*distance);

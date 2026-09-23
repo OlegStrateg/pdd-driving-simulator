@@ -31,8 +31,11 @@ try{
  page=await newPage;await page.waitForLoadState();await page.bringToFront();
  assert.ok(page.url().endsWith('/index.html'));
  await page.locator('#world3d[data-ready="true"]').waitFor({timeout:90000});
- await page.clock.install();await page.reload();await page.locator('#world3d[data-ready="true"]').waitFor({timeout:90000});
- await page.clock.pauseAt(new Date(Date.now()+1000));
+ await page.waitForTimeout(2000);
+ const graphics=await page.locator('#world3d').evaluate(el=>({...el.dataset}));console.log('GRAPHICS',JSON.stringify(graphics));
+ await page.clock.install({time:new Date('2030-01-01T00:00:00Z')});
+ await page.clock.pauseAt(new Date('2030-01-02T00:00:00Z'));
+ await page.reload();await page.locator('#world3d[data-ready="true"]').waitFor({timeout:90000});
  await page.clock.runFor(1000);
  await page.screenshot({path:'artifacts/01-start.png'});
  await page.locator('#start').click();
@@ -131,7 +134,35 @@ try{
  await page.keyboard.press('KeyC');await page.clock.runFor(1000);
  const preview=await page.screenshot({type:'jpeg',quality:65,path:'artifacts/05-map.jpg'});
  console.log('VISUAL_REVIEW_BASE64:'+preview.toString('base64'));
+
+ // Use a real map service through the real UI, then prove saved-area offline reload.
+ await page.reload();await page.clock.runFor(100);
+ await context.setOffline(false);
+ await page.locator('#choose-place').click();
+ await page.locator('#place-name').fill('Москва · тест загрузки');
+ await page.locator('#place-lat').fill('55.7570');await page.locator('#place-lon').fill('37.6130');
+ await page.locator('#load-place').click();
+ await page.locator('#load-place:not([disabled])').waitFor({timeout:60000});
+ const placeStatus=await page.locator('#place-status').innerText();console.log('PLACE_STATUS',placeStatus);
+ assert.equal(await page.locator('#drive-place').isDisabled(),false,placeStatus);
+ await page.locator('#drive-place').click();await page.clock.runFor(100);
+ assert.equal(await page.locator('#telemetry').getAttribute('data-mode'),'3d');
+ const beforePlace=+(await state()).x;
+ await page.keyboard.down('KeyW');await page.clock.runFor(1000);await page.keyboard.up('KeyW');
+ const afterPlace=await state();assert.ok(Math.abs(+afterPlace.x-beforePlace)>0||+afterPlace.speed>0);
+ await page.screenshot({path:'artifacts/09-real-place.png'});
+ await context.setOffline(true);await page.reload();await page.clock.runFor(100);
+ await page.locator('#choose-place').click();await page.locator('#saved-place').click();
+ assert.equal(await page.locator('#drive-place').isDisabled(),false);
+ await page.locator('#drive-place').click();await page.clock.runFor(100);
+ assert.equal((await state()).status,'running');
+ assert.equal(errors.length,0,errors.join('\n'));
+ summary.realPlaceOnline=true;summary.savedPlaceOffline=true;summary.graphics=graphics;
+ await writeFile('artifacts/browser-summary.json',JSON.stringify(summary,null,2));
+ console.log('REAL PLACE PASS',JSON.stringify(summary));
+
 }catch(error){
- if(page){await page.screenshot({path:'artifacts/failure.png'}).catch(()=>{});console.log('FAIL_STATE',await page.locator('#telemetry').evaluate(el=>({...el.dataset})).catch(()=>({})));}
+ console.log('ERRORS',JSON.stringify(errors));
+ if(page){const shot=await page.screenshot({type:'jpeg',quality:65}).catch(()=>null);if(shot)console.log('FAILURE_BASE64:'+shot.toString('base64'));await page.screenshot({path:'artifacts/failure.png'}).catch(()=>{});console.log('FAIL_STATE',await page.locator('#telemetry').evaluate(el=>({...el.dataset})).catch(()=>({})));}
  throw error;
 }finally{await context.close();}
