@@ -20,6 +20,8 @@ jobs:
           node-version: '22'
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm test
+      - name: Install OSM extract tool
+        run: sudo apt-get update -qq && sudo apt-get install -y osmium-tool
       - run: npm run build
       - name: Package and extract actual installer
         run: |

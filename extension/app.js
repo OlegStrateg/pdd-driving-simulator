@@ -164,7 +164,7 @@ function previewPlace(p){
 $('place-preset').onchange=()=>{const option=$('place-preset').selectedOptions[0];if(!option.value)return;const [lat,lon]=option.value.split(',');$('place-lat').value=lat;$('place-lon').value=lon;$('place-name').value=option.textContent;};
 $('choose-place').onclick=()=>$('places-dialog').showModal();
 $('close-places').onclick=()=>$('places-dialog').close();
-$('load-built-place').onclick=async()=>{try{const r=await fetch('assets/moscow-city.json');if(!r.ok)throw Error('Повреждён пакет местности');previewPlace(await r.json());}catch(e){$('place-status').textContent=e.message;}};
+$('load-built-place').onclick=async()=>{try{const r=await fetch('assets/moscow-city.json');if(!r.ok)throw Error('Повреждён пакет местности');const p=await r.json();previewPlace(p);save('saved-place-v1',JSON.stringify(p));}catch(e){$('place-status').textContent=e.message;}};
 $('saved-place').onclick=()=>{try{const p=JSON.parse(stored('saved-place-v1','null'));if(!p)throw Error('Сначала загрузите участок');previewPlace(p);}catch(e){$('place-status').textContent=e.message;}};
 $('load-place').onclick=async()=>{
  $('load-place').disabled=true;$('drive-place').disabled=true;$('place-status').textContent='Загружаем улицы…';
