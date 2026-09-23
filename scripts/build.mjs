@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 const root=path.resolve('extension'),out=path.resolve('dist/extension');
 const manifest=JSON.parse(await readFile(path.join(root,'manifest.json'),'utf8'));
 if(manifest.manifest_version!==3)throw Error('Manifest V3 required');
-if(manifest.permissions||JSON.stringify(manifest.host_permissions)!==JSON.stringify(['https://api.openstreetmap.org/*']))throw Error('Unexpected permissions');
+if(manifest.permissions||JSON.stringify(manifest.host_permissions)!==JSON.stringify(['https://overpass-api.de/*']))throw Error('Unexpected permissions');
 await mkdir(out,{recursive:true});await cp(root,out,{recursive:true});
 await mkdir(path.join(out,'vendor'),{recursive:true});await mkdir(path.join(out,'assets'),{recursive:true});
 for(const [src,dest] of [['babylonjs/babylon.js','babylon.js'],['babylonjs-loaders/babylonjs.loaders.min.js','loaders.js'],['earcut/dist/earcut.min.js','earcut.js']])await cp('node_modules/'+src,path.join(out,'vendor',dest));

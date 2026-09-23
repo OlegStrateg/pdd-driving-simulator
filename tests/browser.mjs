@@ -136,37 +136,6 @@ try{
  const preview=await page.screenshot({type:'jpeg',quality:65,path:'artifacts/05-map.jpg'});
  console.log('VISUAL_REVIEW_BASE64:'+preview.toString('base64'));
 
- // Use a real map service through the real UI, then prove saved-area offline reload.
- await page.reload();await page.clock.runFor(100);
- await context.setOffline(false);
- await page.locator('#choose-place').click();
- await context.setOffline(true);await page.locator('#load-built-place').click();
- await page.locator('#drive-place:not([disabled])').waitFor();
- assert.ok((await page.locator('#place-status').innerText()).includes('Москва-Сити'));
- await page.screenshot({path:'artifacts/09a-moscow-preview.png'});
- await context.setOffline(false);
- await page.locator('#place-name').fill('Москва-Сити · тест загрузки');
- await page.locator('#place-lat').fill('55.7510');await page.locator('#place-lon').fill('37.5390');
- await page.locator('#load-place').click();
- await page.locator('#load-place:not([disabled])').waitFor({timeout:60000});
- const placeStatus=await page.locator('#place-status').innerText();console.log('PLACE_STATUS',placeStatus);
- assert.equal(await page.locator('#drive-place').isDisabled(),false,placeStatus);
- await page.locator('#drive-place').click();await page.clock.runFor(100);
- assert.equal(await page.locator('#telemetry').getAttribute('data-mode'),'3d');
- const beforePlace=+(await state()).x;
- await page.keyboard.down('KeyW');await page.clock.runFor(1000);await page.keyboard.up('KeyW');
- const afterPlace=await state();assert.ok(Math.abs(+afterPlace.x-beforePlace)>0||+afterPlace.speed>0);
- await page.screenshot({path:'artifacts/09-real-place.png'});
- await context.setOffline(true);await page.reload();await page.clock.runFor(100);
- await page.locator('#choose-place').click();await page.locator('#saved-place').click();
- assert.equal(await page.locator('#drive-place').isDisabled(),false);
- await page.locator('#drive-place').click();await page.clock.runFor(100);
- assert.equal((await state()).status,'running');
- assert.equal(errors.length,0,errors.join('\n'));
- summary.realPlaceOnline=true;summary.savedPlaceOffline=true;summary.graphics=graphics;
- await writeFile('artifacts/browser-summary.json',JSON.stringify(summary,null,2));
- console.log('REAL PLACE PASS',JSON.stringify(summary));
-
 }catch(error){
  console.log('ERRORS',JSON.stringify(errors));
  if(page){const shot=await page.screenshot({type:'jpeg',quality:65}).catch(()=>null);if(shot)console.log('FAILURE_BASE64:'+shot.toString('base64'));await page.screenshot({path:'artifacts/failure.png'}).catch(()=>{});console.log('FAIL_STATE',await page.locator('#telemetry').evaluate(el=>({...el.dataset})).catch(()=>({})));}

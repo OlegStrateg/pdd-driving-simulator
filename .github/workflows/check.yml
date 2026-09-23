@@ -38,6 +38,10 @@ jobs:
               print('INSTALL ZIP PASS: root manifest, CRC valid, extracted for browser test')
           PY
       - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Verify Moscow offline and custom area import
+        run: node tests/map-browser.mjs
+        env:
+          TEST_BROWSER: ${{ matrix.browser }}
       - run: npm run test:browser
         env:
           TEST_BROWSER: ${{ matrix.browser }}
@@ -52,21 +56,3 @@ jobs:
             artifacts/*.json
             artifacts/*.zip
           retention-days: 14
-  release:
-    if: github.event_name == 'push'
-    needs: verify
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: simulator-evidence-chrome
-          path: package
-      - name: Publish tested installer
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          COMMIT: ${{ github.sha }}
-        run: |
-          gh release create "preview-${COMMIT:0:12}" package/pdd-driving-simulator.zip package/01b-3d.png package/browser-summary.json --target "$COMMIT" --prerelease --title "3D preview ${COMMIT:0:12}" --notes "Babylon.js renderer, bundled Car Concept model, local textures, coordinate-based OpenStreetMap area loading. Automated Chrome and Chromium checks passed. Real-place mode has no verified traffic-rule assessment."

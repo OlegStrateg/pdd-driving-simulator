@@ -35,8 +35,9 @@ export function pointInPolygon(x,y,points){
 export async function fetchPlace(lat,lon,name){
  if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>85||Math.abs(lon)>180)throw Error('Введите широту и долготу');
  const d=.0032,dx=d/Math.cos(lat*Math.PI/180);
- const box=[lon-dx,lat-d,lon+dx,lat+d].join(',');
- const response=await fetch('https://api.openstreetmap.org/api/0.6/map.json?bbox='+box,{signal:AbortSignal.timeout(35000)});
+ const box=[lat-d,lon-dx,lat+d,lon+dx].join(',');
+ const query='[out:json][timeout:20];(way["highway"]('+box+');way["building"]('+box+');way["building:part"]('+box+'););out geom;';
+ const response=await fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(query),{signal:AbortSignal.timeout(30000)});
  if(!response.ok)throw Error('Сервис карты недоступен ('+response.status+'). Используйте встроенную Москва-Сити.');
  return parsePlace(await response.json(),lat,lon,name);
 }
