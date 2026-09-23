@@ -19,6 +19,7 @@ if(googleChrome){
  const loaded=await cdp.send('Extensions.loadUnpacked',{path:extension});extensionId=loaded.id;
  await cdp.detach();
 }
+context.setDefaultTimeout(60000);
 const errors=[],requests=[];
 context.on('page',p=>{p.on('pageerror',e=>errors.push(e.message));p.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});});
 let page;

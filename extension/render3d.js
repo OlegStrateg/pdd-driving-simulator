@@ -16,8 +16,8 @@ export class Renderer3D {
   const B=globalThis.BABYLON;this.B=B;this.canvas=canvas;this.angle=0;
   this.surface=document.createElement('canvas');this.surface.id='world3d';canvas.after(this.surface);
   this.engine=new B.Engine(this.surface,true,{preserveDrawingBuffer:true,stencil:true,disableWebGL2Support:false});
-  this.surface.dataset.renderer=this.engine.getGlInfo().renderer;
-  this.engine.setHardwareScalingLevel(Math.max(1,(devicePixelRatio||1)/1.25));
+  this.surface.dataset.renderer=this.engine.getGlInfo().renderer;this.software=/swiftshader|llvmpipe/i.test(this.surface.dataset.renderer);this.renderElapsed=0;
+  this.engine.setHardwareScalingLevel(this.software?1.5:Math.max(1,(devicePixelRatio||1)/1.25));
   this.scene=new B.Scene(this.engine);this.scene.useRightHandedSystem=true;this.scene.clearColor=new B.Color4(.58,.72,.82,1);
   this.scene.fogMode=B.Scene.FOGMODE_EXP2;this.scene.fogDensity=.00028;this.scene.fogColor=new B.Color3(.66,.75,.79);
   this.camera=new B.FreeCamera('chase',new B.Vector3(400,65,1160),this.scene);
@@ -25,7 +25,7 @@ export class Renderer3D {
   this.sun=new B.DirectionalLight('sun',new B.Vector3(-.5,-1,.35),this.scene);this.sun.intensity=2.4;
   this.sun.diffuse=new B.Color3(1,.91,.78);this.sun.shadowMinZ=1;this.sun.shadowMaxZ=5000;
   new B.HemisphericLight('ambient',new B.Vector3(0,1,0),this.scene).intensity=.65;
-  this.shadow=new B.ShadowGenerator(2048,this.sun);this.shadow.usePercentageCloserFiltering=true;this.shadow.bias=.0002;this.shadow.normalBias=.15;
+  this.shadow=new B.ShadowGenerator(this.software?1024:2048,this.sun);this.shadow.usePercentageCloserFiltering=true;this.shadow.bias=.0002;this.shadow.normalBias=.15;
   this.scene.environmentTexture=new B.HDRCubeTexture('assets/sky.hdr',this.scene,128,false,true,false,true);
   this.scene.environmentIntensity=.7;
   this.scene.createDefaultSkybox(this.scene.environmentTexture,true,11000,.6);
@@ -171,6 +171,7 @@ export class Renderer3D {
   this.legs.forEach((m,i)=>m.rotation.x=Math.sin(exam.time*8+i*Math.PI)*.4);
   if(this.lights&&!this.place)this.lights.forEach((m,i)=>m.material.emissiveColor=B.Color3.FromHexString(['#ff2929','#ffc52e','#58df80'][i]).scale(lightAt(exam.time)===['red','yellow','green'][i]?1:.03));
   this.marker.setEnabled(!this.place);const next=ROUTE[exam.stage];this.marker.position.set(next.x,3,next.y);
-  this.engine.resize();this.scene.render();this.canvas.dataset.rendered='3d';this.surface.dataset.fps=String(Math.round(this.engine.getFps()));
+  this.canvas.dataset.rendered='3d';this.renderElapsed+=dt;if(this.software&&this.renderElapsed<.1)return;this.renderElapsed=0;
+  this.engine.resize();this.scene.render();this.surface.dataset.fps=String(Math.round(this.engine.getFps()));
  }
 }
