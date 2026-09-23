@@ -1,10 +1,11 @@
 import {cp,mkdir,readFile,readdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {fetchPlace} from '../extension/places.js';
 import {createHash} from 'node:crypto';
 const root=path.resolve('extension'),out=path.resolve('dist/extension');
 const manifest=JSON.parse(await readFile(path.join(root,'manifest.json'),'utf8'));
 if(manifest.manifest_version!==3)throw Error('Manifest V3 required');
-if(manifest.permissions||manifest.host_permissions)throw Error('No browser permissions required');
+if(manifest.permissions||JSON.stringify(manifest.host_permissions)!==JSON.stringify(['https://api.openstreetmap.org/*']))throw Error('Unexpected permissions');
 await mkdir(out,{recursive:true});await cp(root,out,{recursive:true});
 await mkdir(path.join(out,'vendor'),{recursive:true});await mkdir(path.join(out,'assets'),{recursive:true});
 for(const [src,dest] of [['babylonjs/babylon.js','babylon.js'],['babylonjs-loaders/babylonjs.loaders.min.js','loaders.js'],['earcut/dist/earcut.min.js','earcut.js']])await cp('node_modules/'+src,path.join(out,'vendor',dest));
@@ -26,3 +27,7 @@ await writeFile(path.join(out,'assets','sources.json'),JSON.stringify(receipt,nu
 await cp('node_modules/babylonjs/license.md',path.join(out,'vendor','Babylon-LICENSE.md'));
 await cp('node_modules/earcut/LICENSE',path.join(out,'vendor','Earcut-LICENSE'));
 console.log('BUILD PASS: bundled WebGL engine, GLB model and local textures',JSON.stringify(receipt));
+
+const city=await fetchPlace(55.7498,37.5390,'Москва-Сити');
+await writeFile(path.join(out,'assets','moscow-city.json'),JSON.stringify(city));
+console.log('MOSCOW CITY PACKAGE PASS',JSON.stringify({roads:city.roads.length,buildings:city.buildings.length,fetchedAt:city.fetchedAt,attribution:city.attribution}));

@@ -21,7 +21,7 @@ if(googleChrome){
 }
 context.setDefaultTimeout(60000);
 const errors=[],requests=[];
-context.on('page',p=>{p.on('pageerror',e=>errors.push(e.message));p.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});});
+context.on('page',p=>{p.on('pageerror',e=>errors.push(e.message));p.on('requestfailed',r=>console.log('REQUEST_FAILED',r.url(),JSON.stringify(r.failure())));p.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});});
 let page;
 try{
  await context.setOffline(true);
@@ -140,8 +140,13 @@ try{
  await page.reload();await page.clock.runFor(100);
  await context.setOffline(false);
  await page.locator('#choose-place').click();
+ await context.setOffline(true);await page.locator('#load-built-place').click();
+ await page.locator('#drive-place:not([disabled])').waitFor();
+ assert.ok((await page.locator('#place-status').innerText()).includes('Москва-Сити'));
+ await page.screenshot({path:'artifacts/09a-moscow-preview.png'});
+ await context.setOffline(false);
  await page.locator('#place-name').fill('Москва-Сити · тест загрузки');
- await page.locator('#place-lat').fill('55.7498');await page.locator('#place-lon').fill('37.5390');
+ await page.locator('#place-lat').fill('55.7510');await page.locator('#place-lon').fill('37.5390');
  await page.locator('#load-place').click();
  await page.locator('#load-place:not([disabled])').waitFor({timeout:60000});
  const placeStatus=await page.locator('#place-status').innerText();console.log('PLACE_STATUS',placeStatus);

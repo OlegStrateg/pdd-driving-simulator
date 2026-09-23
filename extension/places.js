@@ -3,17 +3,19 @@ export function parsePlace(data,lat,lon,name='Выбранная местнос�
  if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>85||Math.abs(lon)>180)throw Error('Проверьте координаты');
  if(!Array.isArray(data.elements)||data.elements.length>30000)throw Error('Некорректный или слишком большой участок');
  const project=p=>({x:(p.lon-lon)*111320*Math.cos(lat*Math.PI/180),y:-(p.lat-lat)*111320});
- const roads=[],buildings=[];
+ const roads=[],buildings=[];const nodes=new Map(data.elements.filter(e=>e.type==='node').map(e=>[e.id,e]));
  for(const e of data.elements){
-  if(e.type!=='way'||!Array.isArray(e.geometry)||e.geometry.length<2)continue;
-  const points=e.geometry.map(project);
+  if(e.type!=='way')continue;
+  const geometry=e.geometry||e.nodes?.map(id=>nodes.get(id)).filter(Boolean);
+  if(!geometry||geometry.length<2)continue;
+  const points=geometry.map(project);
   if(points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)||Math.abs(p.x)>1600||Math.abs(p.y)>1600))continue;
   const t=e.tags||{};
   if(t.highway&&!['footway','path','steps','cycleway','pedestrian','construction','proposed'].includes(t.highway)&&t.access!=='private'){
    const lanes=Math.min(6,Math.max(1,parseInt(t.lanes)||2));
    roads.push({points,width:Math.min(24,Math.max(3,parseFloat(t.width)||lanes*3.4)),name:t.name||'Улица без названия',oneway:t.oneway==='yes'||t.oneway==='1',reverse:t.oneway==='-1'});
   }
-  if(t.building&&points.length>=4)buildings.push({points,height:Math.min(65,Math.max(3,parseFloat(t.height)||(parseInt(t['building:levels'])||3)*3.2))});
+  if((t.building||t['building:part'])&&points.length>=4)buildings.push({points,height:Math.min(450,Math.max(3,parseFloat(t.height)||(parseInt(t['building:levels'])||3)*3.2))});
  }
  if(!roads.length)throw Error('В этом участке нет доступных автомобильных дорог. Выберите другую точку.');
  const segments=roads.flatMap(r=>r.points.slice(1).map((p,i)=>({a:r.points[i],b:p,r}))).filter(s=>Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y)>18);
@@ -33,9 +35,8 @@ export function pointInPolygon(x,y,points){
 export async function fetchPlace(lat,lon,name){
  if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>85||Math.abs(lon)>180)throw Error('Введите широту и долготу');
  const d=.0032,dx=d/Math.cos(lat*Math.PI/180);
- const box=[lat-d,lon-dx,lat+d,lon+dx].join(',');
- const query='[out:json][timeout:25];(way["highway"]('+box+');way["building"]('+box+'););out geom;';
- const response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:new URLSearchParams({data:query}),signal:AbortSignal.timeout(35000)});
- if(!response.ok)throw Error('Сервис карты недоступен ('+response.status+'). Повторите позже.');
+ const box=[lon-dx,lat-d,lon+dx,lat+d].join(',');
+ const response=await fetch('https://api.openstreetmap.org/api/0.6/map.json?bbox='+box,{signal:AbortSignal.timeout(35000)});
+ if(!response.ok)throw Error('Сервис карты недоступен ('+response.status+'). Используйте встроенную Москва-Сити.');
  return parsePlace(await response.json(),lat,lon,name);
 }
