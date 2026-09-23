@@ -188,6 +188,6 @@ export class Renderer3D {
   if(this.lights&&!this.place)this.lights.forEach((m,i)=>m.material.emissiveColor=B.Color3.FromHexString(['#ff2929','#ffc52e','#58df80'][i]).scale(lightAt(exam.time)===['red','yellow','green'][i]?1:.03));
   this.marker.setEnabled(!this.place);const next=ROUTE[exam.stage];this.marker.position.set(next.x,3,next.y);
   this.canvas.dataset.rendered='3d';this.renderElapsed+=dt;if(this.software&&this.renderElapsed<.1)return;this.renderElapsed=0;
-  this.engine.resize();this.scene.render();if(this.scene.isReady())this.lastStaticFrame=stamp;this.surface.dataset.fps=String(Math.round(this.engine.getFps()));
+  this.engine.resize();this.scene.render();if(this.software)this.engine._gl.finish();if(this.scene.isReady())this.lastStaticFrame=stamp;this.surface.dataset.fps=String(Math.round(this.engine.getFps()));
  }
 }

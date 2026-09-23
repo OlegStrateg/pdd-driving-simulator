@@ -140,8 +140,8 @@ try{
  await page.reload();await page.clock.runFor(100);
  await context.setOffline(false);
  await page.locator('#choose-place').click();
- await page.locator('#place-name').fill('Москва · тест загрузки');
- await page.locator('#place-lat').fill('55.7570');await page.locator('#place-lon').fill('37.6130');
+ await page.locator('#place-name').fill('Москва-Сити · тест загрузки');
+ await page.locator('#place-lat').fill('55.7498');await page.locator('#place-lon').fill('37.5390');
  await page.locator('#load-place').click();
  await page.locator('#load-place:not([disabled])').waitFor({timeout:60000});
  const placeStatus=await page.locator('#place-status').innerText();console.log('PLACE_STATUS',placeStatus);
