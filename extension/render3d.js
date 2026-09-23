@@ -23,7 +23,7 @@ export class Renderer3D {
   this.camera=new B.FreeCamera('chase',new B.Vector3(400,65,1160),this.scene);
   this.camera.minZ=1;this.camera.maxZ=12000;this.camera.fov=.85;
   this.sun=new B.DirectionalLight('sun',new B.Vector3(-.5,-1,.35),this.scene);this.sun.intensity=2.4;
-  this.sun.diffuse=new B.Color3(1,.91,.78);this.sun.shadowMinZ=1;this.sun.shadowMaxZ=5000;
+  this.sun.shadowFrustumSize=1500;this.sun.diffuse=new B.Color3(1,.91,.78);this.sun.shadowMinZ=1;this.sun.shadowMaxZ=5000;
   new B.HemisphericLight('ambient',new B.Vector3(0,1,0),this.scene).intensity=.65;
   this.shadow=new B.ShadowGenerator(this.software?1024:2048,this.sun);this.shadow.usePercentageCloserFiltering=true;this.shadow.bias=.0002;this.shadow.normalBias=.15;
   this.scene.environmentTexture=new B.HDRCubeTexture('assets/sky.hdr',this.scene,128,false,true,false,true);
@@ -78,7 +78,7 @@ export class Renderer3D {
    SOLIDS.forEach((r,i)=>this.building(r,i));
    for(const [x,z] of [[250,550],[250,720],[250,940],[530,495],[745,490],[1000,505],[510,790],[1050,960],[540,975],[850,975],[1420,970],[1460,495],[1740,850],[1850,880],[580,240],[890,230],[1020,235],[1780,265],[650,745],[745,770],[560,1250],[680,1250],[1080,1295],[1360,1250],[1470,1270],[1740,1250]])this.tree(x,z);
    for(const [x,z] of [[695,1223],[1450,1223],[1715,990],[1715,550],[1020,285],[520,285],[285,540],[285,1000]])this.lamp(x,z);
-   this.sign(650,1218,'40');this.sign(840,1218,'ПЕШЕХОД');this.sign(1480,1218,'STOP');this.sign(1315,295,'УСТУПИ');this.sign(1045,1260,'P');
+   this.sign(650,1218,'40');this.sign(840,1218,'ПЕШЕХОД');this.sign(1480,1218,'STOP');this.sign(1540,1235,'NO RIGHT');this.sign(1315,295,'УСТУПИ');this.sign(1045,1260,'P');
    this.lamp(1700,805);
    this.lights=['#ff2929','#ffc52e','#58df80'].map((col,i)=>this.box(1700,800,62-i*9,7,3,7,this.material('light'+i,col)));this.lights.forEach(m=>m.metadata={keep:true});
   }
@@ -86,7 +86,7 @@ export class Renderer3D {
   const groups=new Map();for(const m of this.city){if(m.metadata?.keep)continue;const key=m.material.uniqueId;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(m);}
   const merged=[];for(const meshes of groups.values()){
    const m=this.B.Mesh.MergeMeshes(meshes,true,true,undefined,false,false);
-   if(m){m.receiveShadows=true;this.shadow.addShadowCaster(m);m.freezeWorldMatrix();merged.push(m);}
+   if(m){m.receiveShadows=true;if(!['grass','asphalt','paint','sidewalk','parking'].includes(m.material.name))this.shadow.addShadowCaster(m);m.freezeWorldMatrix();merged.push(m);}
   }
   this.city=[...this.city.filter(m=>m.metadata?.keep),...merged];
  }
@@ -128,10 +128,23 @@ export class Renderer3D {
  sign(x,z,text){
   const B=this.B;this.box(x,z,0,2,2,46,this.material('pole','#727c7c',.6));
   const tex=new B.DynamicTexture('sign '+text,256,this.scene,false),c=tex.getContext();c.clearRect(0,0,256,256);
-  c.fillStyle=text==='STOP'?'#c83329':text==='P'||text==='ПЕШЕХОД'?'#176cbd':'#fff';c.fillRect(4,4,248,248);c.strokeStyle=text==='40'||text==='УСТУПИ'?'#cf312c':'#fff';c.lineWidth=18;c.strokeRect(13,13,230,230);
-  c.fillStyle=text==='40'?'#111':'#fff';c.textAlign='center';c.font='bold '+(text==='ПЕШЕХОД'?85:100)+'px Arial';c.fillText(text==='ПЕШЕХОД'?'↟':text==='УСТУПИ'?'▽':text,128,166);tex.update();
+
+  c.lineWidth=14;c.strokeStyle='#d63327';c.fillStyle='#fff';c.textAlign='center';c.textBaseline='middle';
+  if(text==='40'||text==='NO RIGHT'){
+   c.beginPath();c.arc(128,128,111,0,Math.PI*2);c.fill();c.stroke();c.fillStyle='#17252b';c.font='bold 112px Arial';c.fillText(text==='40'?'40':'↱',128,132);
+   if(text==='NO RIGHT'){c.beginPath();c.moveTo(48,210);c.lineTo(208,48);c.stroke();}
+  }else if(text==='STOP'){
+   c.beginPath();for(let i=0;i<8;i++){const a=Math.PI/8+i*Math.PI/4;const x=128+113*Math.cos(a),y=128+113*Math.sin(a);i?c.lineTo(x,y):c.moveTo(x,y);}c.closePath();c.fillStyle='#c52c23';c.fill();c.strokeStyle='#fff';c.lineWidth=7;c.stroke();c.fillStyle='#fff';c.font='bold 68px Arial';c.fillText('STOP',128,131);
+  }else if(text==='УСТУПИ'){
+   c.beginPath();c.moveTo(17,30);c.lineTo(239,30);c.lineTo(128,228);c.closePath();c.fill();c.stroke();
+  }else{
+   c.fillStyle='#1669b3';c.fillRect(4,4,248,248);c.strokeStyle='#fff';c.lineWidth=8;c.strokeRect(9,9,238,238);
+   c.fillStyle='#fff';if(text==='P'){c.font='bold 180px Arial';c.fillText('P',128,139);}
+   else{c.beginPath();c.moveTo(128,24);c.lineTo(29,219);c.lineTo(227,219);c.closePath();c.fill();c.strokeStyle='#19282c';c.lineWidth=10;c.beginPath();c.arc(128,94,10,0,7);c.moveTo(128,110);c.lineTo(117,153);c.lineTo(83,186);c.moveTo(117,153);c.lineTo(157,186);c.moveTo(125,120);c.lineTo(158,143);c.moveTo(124,121);c.lineTo(96,145);c.stroke();for(let i=0;i<4;i++)c.fillStyle='#19282c',c.fillRect(64+i*35,198,24,7);}
+  }
+  tex.update();
   const mat=new B.StandardMaterial('sign',this.scene);mat.diffuseTexture=tex;mat.backFaceCulling=false;mat.emissiveColor=new B.Color3(.15,.15,.15);
-  const m=B.MeshBuilder.CreatePlane('sign',{size:23,sideOrientation:B.Mesh.DOUBLESIDE},this.scene);m.position.set(x,57,z);m.rotation.y=-Math.PI/2;m.material=mat;this.city.push(m);
+  const m=B.MeshBuilder.CreatePlane('sign',{size:23,sideOrientation:B.Mesh.DOUBLESIDE},this.scene);m.position.set(x,57,z);m.rotation.y=text==='УСТУПИ'?Math.PI/2:-Math.PI/2;m.material=mat;mat.diffuseTexture.hasAlpha=true;mat.useAlphaFromDiffuseTexture=true;this.city.push(m);
  }
  makePerson(){
   const B=this.B,p=new B.TransformNode('pedestrian',this.scene);
@@ -164,7 +177,7 @@ export class Renderer3D {
   const distance=110+Math.abs(c.speed)*.12,a=this.angle;
   this.camera.position.set(c.x-Math.cos(a)*distance,62,c.y-Math.sin(a)*distance);
   this.camera.setTarget(new B.Vector3(c.x+Math.cos(a)*100,15,c.y+Math.sin(a)*100));
-  this.sun.position.set(c.x+400,1200,c.y-700);
+  this.sun.position.set(c.x+600,1200,c.y-420);
   const t=trafficAt(exam.time),p=pedestrianAt(exam.time);
   this.other.setEnabled(!this.place&&t.active);this.other.position.set(t.x,2,t.y);this.other.rotation.y=-t.angle;
   this.person.setEnabled(!this.place&&p.active);this.person.position.set(p.x,2,p.y);
