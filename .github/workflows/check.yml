@@ -2,6 +2,7 @@ name: Simulator checks
 on:
   push:
     branches: [main, feature/driving-simulator]
+    paths-ignore: ['README.md', 'docs/**']
   pull_request:
 permissions:
   contents: read
@@ -57,4 +58,10 @@ jobs:
             artifacts/*.html
             artifacts/*.json
             artifacts/*.zip
+          retention-days: 14
+      - name: Downloadable installer with root manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdd-driving-simulator-${{ matrix.browser }}
+          path: dist/extension/
           retention-days: 14

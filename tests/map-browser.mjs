@@ -17,7 +17,10 @@ try{
  await page.locator('#drive-place').click();
  await page.waitForTimeout(400);
  const before=await page.locator('#telemetry').evaluate(e=>({...e.dataset}));
- await page.keyboard.down('KeyW');await page.waitForTimeout(700);await page.keyboard.up('KeyW');
+ await page.keyboard.down('KeyW');
+ try{await page.waitForFunction(({x,y})=>{const s=document.getElementById('telemetry').dataset;return Math.hypot(+s.x-x,+s.y-y)>.05;},{x:+before.x,y:+before.y},{timeout:30000,polling:100});}
+ finally{await page.keyboard.up('KeyW');}
+
  await page.keyboard.press('Escape');
  const after=await page.locator('#telemetry').evaluate(e=>({...e.dataset}));
  assert.ok(Math.hypot(+after.x-before.x,+after.y-before.y)>0,'Vehicle must move through keyboard input');
@@ -38,4 +41,4 @@ try{
  assert.equal(errors.length,0,errors.join('\n'));
  const summary={bundledMoscowOffline:true,keyboardDriving:true,customAreaOnline,savedAreaOffline:true,errors};
  await writeFile('artifacts/map-summary.json',JSON.stringify(summary,null,2));console.log('MAP PASS',JSON.stringify(summary));
-}catch(e){console.log('MAP_ERRORS',errors);const shot=await page.screenshot({type:'jpeg',quality:65}).catch(()=>null);if(shot)console.log('MAP_FAILURE_BASE64:'+shot.toString('base64'));throw e;}finally{await context.close();}
+}catch(e){console.log('MAP_ERRORS',errors,await page.locator('#telemetry').evaluate(e=>({...e.dataset})));const shot=await page.screenshot({type:'jpeg',quality:65}).catch(()=>null);if(shot)console.log('MAP_FAILURE_BASE64:'+shot.toString('base64'));throw e;}finally{await context.close();}

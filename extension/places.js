@@ -11,7 +11,7 @@ export function parsePlace(data,lat,lon,name='Выбранная местнос�
   const points=geometry.map(project);
   if(points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)||Math.abs(p.x)>1600||Math.abs(p.y)>1600))continue;
   const t=e.tags||{};
-  if(t.highway&&!['footway','path','steps','cycleway','pedestrian','construction','proposed'].includes(t.highway)&&t.access!=='private'){
+  if(t.highway&&t.tunnel!=='yes'&&!(Number(t.layer)<0)&&!['footway','path','steps','cycleway','pedestrian','construction','proposed'].includes(t.highway)&&t.access!=='private'){
    const lanes=Math.min(6,Math.max(1,parseInt(t.lanes)||2));
    roads.push({points,width:Math.min(24,Math.max(3,parseFloat(t.width)||lanes*3.4)),name:t.name||'Улица без названия',oneway:t.oneway==='yes'||t.oneway==='1',reverse:t.oneway==='-1'});
   }
@@ -21,8 +21,16 @@ export function parsePlace(data,lat,lon,name='Выбранная местнос�
  const segments=roads.flatMap(r=>r.points.slice(1).map((p,i)=>({a:r.points[i],b:p,r}))).filter(s=>Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y)>18);
  segments.sort((a,b)=>Math.hypot((a.a.x+a.b.x)/2,(a.a.y+a.b.y)/2)-Math.hypot((b.a.x+b.b.x)/2,(b.a.y+b.b.y)/2));
  if(!segments.length)throw Error('Не найден подходящий участок для старта');
- const s=segments[0],angle=Math.atan2(s.b.y-s.a.y,s.b.x-s.a.x)+(s.r.reverse?Math.PI:0);
- const spawn={x:(s.a.x+s.b.x)/2-Math.sin(angle)*s.r.width/4,y:(s.a.y+s.b.y)/2+Math.cos(angle)*s.r.width/4,angle};
+
+ let spawn;
+ for(const s of segments){
+  const angle=Math.atan2(s.b.y-s.a.y,s.b.x-s.a.x)+(s.r.reverse?Math.PI:0);
+  const candidate={x:(s.a.x+s.b.x)/2-Math.sin(angle)*s.r.width/4,y:(s.a.y+s.b.y)/2+Math.cos(angle)*s.r.width/4,angle};
+  const samples=[[0,0],[2.5,1.3],[2.5,-1.3],[-2.5,1.3],[-2.5,-1.3],[7,0]].map(([a,b])=>({x:candidate.x+a*Math.cos(angle)-b*Math.sin(angle),y:candidate.y+a*Math.sin(angle)+b*Math.cos(angle)}));
+  if(samples.every(p=>buildings.every(b=>!pointInPolygon(p.x,p.y,b.points)))){spawn=candidate;break;}
+ }
+ if(!spawn)throw Error('В участке не найдена безопасная точка старта вне зданий');
+
  return {name:String(name).slice(0,100),lat,lon,roads,buildings,spawn,attribution:'© OpenStreetMap contributors · ODbL',fetchedAt:new Date().toISOString()};
 }
 export function pointInPolygon(x,y,points){
