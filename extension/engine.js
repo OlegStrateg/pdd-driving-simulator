@@ -107,5 +107,5 @@ export class Exam {
   }
   if(this.time>=this.recordAt){this.trace.push({t:Math.round(this.time-this.startedAt),x:Math.round(c.x),y:Math.round(c.y)});this.recordAt=this.time+1;}
  }
- report(){return {app:'Практика ПДД',version:'0.2.0',scenario:this.scenario||'route',completed:this.status==='finished',accident:this.status==='accident',duration:Math.round(this.time-this.startedAt),checkpoints:this.stage,totalCheckpoints:ROUTE.length-1,faults:this.faults,trace:this.trace,notice:'Учебный протокол. Не официальная оценка экзамена ГИБДД.'};}
+ report(){return {app:'Практика ПДД',version:'0.3.0',scenario:this.scenario||'route',completed:this.status==='finished',accident:this.status==='accident',duration:Math.round(this.time-this.startedAt),checkpoints:this.stage,totalCheckpoints:ROUTE.length-1,faults:this.faults,trace:this.trace,notice:'Учебный протокол. Не официальная оценка экзамена ГИБДД.'};}
 }

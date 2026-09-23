@@ -7,7 +7,15 @@ import {fetchPlace,pointInPolygon} from './places.js';
 import {advanceCar} from './car.js';
 import {reportHTML} from './report.js';
 const $=id=>document.getElementById(id);
-const exam=new Exam(),renderer2d=new Renderer($('world')),renderer3d=new Renderer3D($('world')),keys=new Set();
+const exam=new Exam(),renderer2d=new Renderer($('world')),keys=new Set();
+let renderer3d;
+try{renderer3d=new Renderer3D($('world'));}
+catch(e){
+ document.getElementById('world3d')?.remove();
+ renderer3d={unavailable:true,visible(){},buildCity(){},draw(exam,dt){renderer2d.draw(exam,dt);}};
+ $('view-3d').disabled=true;$('choose-place').disabled=true;
+ $('coach').textContent='3D недоступен: включите аппаратное ускорение браузера. Учебный маршрут доступен в 2D.';
+}
 const stored=(key,fallback)=>{try{return localStorage.getItem(key)||fallback;}catch{return fallback;}};
 const save=(key,value)=>{try{localStorage.setItem(key,value);}catch{}};
 let mode=stored('view-mode','3d'),last=performance.now(),seenFaults=0,noticeUntil=0,resultShown=false,lastStage=-1,learning=false,learningStep=0,learningKeys=new Set(),tutorialResume=false;
@@ -20,9 +28,11 @@ const lessons=[
  {title:'Пауза, виды и правила',text:'Esc ставит поездку на паузу. V переключает 2D / 3D, C открывает карту. Красная карточка объясняет нарушение; все события сохраняются в журнале справа. ДТП завершает поездку. На переходе дождитесь пешехода. Проверьте V и Esc.',keys:[['KeyV','V'],['Escape','Esc']]}
 ];
 ROUTE.forEach((p,i)=>{const li=document.createElement('li');const n=document.createElement('b');n.textContent=String(i+1).padStart(2,'0');const label=document.createElement('span');label.textContent=p.label;li.append(n,label);$('route').append(li);});
-function setMode(value){if(place)value='3d';mode=value;save('view-mode',mode);renderer2d.overview=false;$('view-2d').setAttribute('aria-pressed',mode==='2d');$('view-3d').setAttribute('aria-pressed',mode==='3d');$('camera').querySelector('span').textContent='Весь маршрут';}
+function setMode(value){if(renderer3d.unavailable)value='2d';else if(place)value='3d';mode=value;save('view-mode',mode);renderer2d.overview=false;$('view-2d').setAttribute('aria-pressed',mode==='2d');$('view-3d').setAttribute('aria-pressed',mode==='3d');$('camera').querySelector('span').textContent='Весь маршрут';}
 setMode(mode);
 function start(){
+ $('place-credit').classList.add('hidden');$('scene-name').textContent='ЗЕЛЁНЫЙ КВАРТАЛ';
+ $('view-2d').disabled=false;$('camera').disabled=false;document.querySelector('.limit').textContent='40';document.querySelector('.limit').setAttribute('aria-label','Ограничение скорости 40');
  if(place){place=null;renderer3d.buildCity();}
  exam.start($('scenario').value);renderer2d.overview=false;renderer3d.angle=exam.car.angle;keys.clear();seenFaults=0;resultShown=false;lastStage=-1;
  $('intro').classList.add('hidden');$('learning').classList.add('hidden');$('pause-panel').classList.add('hidden');
@@ -62,6 +72,7 @@ function showResult(){
   const advice=document.createElement('p');advice.textContent='Как правильно: '+f.advice;
   item.append(time,title,detail,advice);$('fault-list').append(item);
  }
+ if(place){$('result-title').textContent='Знакомство с местностью завершено';$('result-summary').textContent=place.name+' · '+Math.round(exam.time)+' сек. Проверка ПДД для этого участка не включена.';$('fault-list').replaceChildren();}
  save('last-report-v2',JSON.stringify(exam.report()));$('pause').disabled=true;$('finish').disabled=true;$('result').showModal();
 }
 function camera(){if(place)return;renderer2d.overview=!renderer2d.overview;$('camera').querySelector('span').textContent=renderer2d.overview?'За автомобилем':'Весь маршрут';}
@@ -88,7 +99,7 @@ document.addEventListener('keydown',e=>{
   for(const k of $('learning-keys').children)k.classList.toggle('pressed',learningKeys.has(k.dataset.code));
   if(expected.every(([code])=>learningKeys.has(code))){$('learning-next').disabled=false;$('learning-confirm').textContent='Клавиши проверены. Можно продолжать.';}return;
  }
- if($('help-dialog').open||$('result').open)return;
+ if($('help-dialog').open||$('result').open||$('places-dialog').open)return;
  if(driveKeys.has(e.code)){e.preventDefault();if(exam.status==='running')keys.add(e.code);}
  if(e.repeat)return;
  if(e.code==='Escape')pause();
@@ -150,6 +161,7 @@ function previewPlace(p){
  const [x,y]=xy(p.spawn);ctx.fillStyle='#bf3b2e';ctx.beginPath();ctx.arc(x,y,5,0,7);ctx.fill();
  $('drive-place').disabled=false;$('place-status').textContent=p.name+': '+p.roads.length+' улиц, '+p.buildings.length+' зданий. Красная точка — старт.';
 }
+$('place-preset').onchange=()=>{const option=$('place-preset').selectedOptions[0];if(!option.value)return;const [lat,lon]=option.value.split(',');$('place-lat').value=lat;$('place-lon').value=lon;$('place-name').value=option.textContent;};
 $('choose-place').onclick=()=>$('places-dialog').showModal();
 $('close-places').onclick=()=>$('places-dialog').close();
 $('saved-place').onclick=()=>{try{const p=JSON.parse(stored('saved-place-v1','null'));if(!p)throw Error('Сначала загрузите участок');previewPlace(p);}catch(e){$('place-status').textContent=e.message;}};
@@ -164,8 +176,9 @@ $('load-place').onclick=async()=>{
 };
 $('drive-place').onclick=()=>{
  if(!pendingPlace)return;
- start();place=pendingPlace;exam.scenario='free';exam.started=true;exam.time=0;exam.startedAt=0;
+ start();place=pendingPlace;$('place-credit').classList.remove('hidden');$('scene-name').textContent=place.name;exam.scenario='free';exam.started=true;exam.time=0;exam.startedAt=0;
  Object.assign(exam.car,{x:place.spawn.x*10,y:place.spawn.y*10,angle:place.spawn.angle,speed:0});
+ $('view-2d').disabled=true;$('camera').disabled=true;document.querySelector('.limit').textContent='—';document.querySelector('.limit').setAttribute('aria-label','Ограничение по карте не проверено');
  renderer3d.buildCity(place);renderer3d.angle=exam.car.angle;setMode('3d');
  $('places-dialog').close();$('intro').classList.add('hidden');$('route').classList.add('hidden');
  $('coach').textContent='Здесь можно познакомиться с геометрией улиц. Правила и знаки для этого участка не проверены.';

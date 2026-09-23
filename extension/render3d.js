@@ -33,6 +33,7 @@ export class Renderer3D {
   this.materials=new Map();this.city=[];this.buildCity();
   this.player=new B.TransformNode('player',this.scene);this.other=new B.TransformNode('traffic',this.scene);
   this.person=this.makePerson();
+  this.marker=B.MeshBuilder.CreateTorus('next waypoint',{diameter:32,thickness:2,tessellation:24},this.scene);this.marker.material=this.material('waypoint','#e1f58d');this.marker.material.emissiveColor=new B.Color3(.4,.55,.1);
   this.ready=this.loadCar().catch(e=>{this.surface.dataset.error=e.message;throw e;});
   this.ready.catch(()=>{});
   this.resize=new ResizeObserver(()=>this.engine.resize());this.resize.observe(canvas.parentElement);
@@ -169,6 +170,7 @@ export class Renderer3D {
   this.person.setEnabled(!this.place&&p.active);this.person.position.set(p.x,2,p.y);
   this.legs.forEach((m,i)=>m.rotation.x=Math.sin(exam.time*8+i*Math.PI)*.4);
   if(this.lights&&!this.place)this.lights.forEach((m,i)=>m.material.emissiveColor=B.Color3.FromHexString(['#ff2929','#ffc52e','#58df80'][i]).scale(lightAt(exam.time)===['red','yellow','green'][i]?1:.03));
+  this.marker.setEnabled(!this.place);const next=ROUTE[exam.stage];this.marker.position.set(next.x,3,next.y);
   this.engine.resize();this.scene.render();this.canvas.dataset.rendered='3d';this.surface.dataset.fps=String(Math.round(this.engine.getFps()));
  }
 }
