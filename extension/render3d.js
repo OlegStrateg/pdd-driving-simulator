@@ -169,7 +169,10 @@ export class Renderer3D {
  }
  visible(value){this.surface.classList.toggle('hidden',!value);this.canvas.classList.toggle('hidden',value);}
  draw(exam,dt){
-  this.visible(true);const B=this.B,c=exam.car;
+  this.visible(true);const B=this.B,c=exam.car;this.canvas.dataset.rendered='3d';
+  const stamp=exam.status!=='running'?[exam.status,exam.time,c.x,c.y,c.angle,this.surface.clientWidth,this.surface.clientHeight,this.place?.fetchedAt].join(':'):null;
+  if(stamp&&stamp===this.lastStaticFrame&&this.scene.isReady())return;
+
   this.angle+=Math.atan2(Math.sin(c.angle-this.angle),Math.cos(c.angle-this.angle))*Math.min(1,dt*5);
   this.wheelRoll=(this.wheelRoll||0)+c.speed*dt/3.8;
   for(const w of this.wheels||[]){const base=w.quaternion||B.Quaternion.FromEulerVector(w.rotation);w.node.rotationQuaternion=B.Quaternion.RotationAxis(B.Axis.Z,/Front/.test(w.node.name)?-c.steer:0).multiply(B.Quaternion.RotationAxis(B.Axis.X,this.wheelRoll)).multiply(base);}
@@ -185,6 +188,6 @@ export class Renderer3D {
   if(this.lights&&!this.place)this.lights.forEach((m,i)=>m.material.emissiveColor=B.Color3.FromHexString(['#ff2929','#ffc52e','#58df80'][i]).scale(lightAt(exam.time)===['red','yellow','green'][i]?1:.03));
   this.marker.setEnabled(!this.place);const next=ROUTE[exam.stage];this.marker.position.set(next.x,3,next.y);
   this.canvas.dataset.rendered='3d';this.renderElapsed+=dt;if(this.software&&this.renderElapsed<.1)return;this.renderElapsed=0;
-  this.engine.resize();this.scene.render();this.surface.dataset.fps=String(Math.round(this.engine.getFps()));
+  this.engine.resize();this.scene.render();if(this.scene.isReady())this.lastStaticFrame=stamp;this.surface.dataset.fps=String(Math.round(this.engine.getFps()));
  }
 }
